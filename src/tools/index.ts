@@ -1,0 +1,33 @@
+/**
+ * Tool registration and exports
+ */
+
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { FILE_TOOLS } from './file-tools.js';
+import { WRITE_TOOLS } from './write-tools.js';
+import { SEARCH_TOOLS } from './search-tools.js';
+import { PERIODIC_TOOLS } from './periodic-tools.js';
+import { OBSIDIAN_TOOLS } from './obsidian-tools.js';
+import { GRAPH_TOOLS } from './graph-tools.js';
+import { SEMANTIC_TOOLS } from './semantic-tools.js';
+
+/** All available tools */
+export const ALL_TOOLS: Tool[] = [
+  ...FILE_TOOLS,
+  ...WRITE_TOOLS,
+  ...SEARCH_TOOLS,
+  ...PERIODIC_TOOLS,
+  ...OBSIDIAN_TOOLS,
+  ...GRAPH_TOOLS,
+  ...SEMANTIC_TOOLS,
+];
+
+export {
+  FILE_TOOLS,
+  WRITE_TOOLS,
+  SEARCH_TOOLS,
+  PERIODIC_TOOLS,
+  OBSIDIAN_TOOLS,
+  GRAPH_TOOLS,
+  SEMANTIC_TOOLS,
+};

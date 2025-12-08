@@ -1,0 +1,75 @@
+{
+  "name": "@connorbritain/obsidian-mcp-server",
+  "version": "0.1.0",
+  "description": "TypeScript MCP server for Obsidian with core tools, graph analytics, and semantic search",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "obsidian-mcp": "dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/connorbritain/obsidian-mcp-server"
+  },
+  "keywords": [
+    "mcp",
+    "obsidian",
+    "model-context-protocol",
+    "ai",
+    "llm",
+    "knowledge-management",
+    "graph-analysis",
+    "semantic-search"
+  ],
+  "author": "Connor Britain",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/connorbritain/obsidian-mcp-server/issues"
+  },
+  "homepage": "https://github.com/connorbritain/obsidian-mcp-server#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.4.0",
+    "axios": "^1.7.7",
+    "graphology": "^0.25.4",
+    "graphology-communities-louvain": "^0.8.0",
+    "graphology-metrics": "^2.3.0",
+    "graphology-shortest-path": "^2.2.1",
+    "graphology-traversal": "^0.7.1",
+    "graphology-utils": "^2.3.1",
+    "lru-cache": "^11.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/graphology-communities-louvain": "^0.8.0",
+    "eslint": "^9.12.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-jsonc": "^2.15.0",
+    "eslint-plugin-n": "^17.10.3",
+    "eslint-plugin-promise": "^6.6.1",
+    "tsup": "^8.1.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
