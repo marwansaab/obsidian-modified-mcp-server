@@ -54,55 +54,16 @@ Set the following environment variables:
 
 ## MCP Client Configuration
 
-### Claude Desktop
-
-Add to your `claude_desktop_config.json` (typically at `~/.config/claude/claude_desktop_config.json` on Linux/Mac or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
-
-```json
-{
-  "mcpServers": {
-    "obsidian": {
-      "command": "node",
-      "args": ["/path/to/obsidian_mcp/dist/index.js"],
-      "env": {
-        "OBSIDIAN_API_KEY": "your-api-key-here",
-        "OBSIDIAN_VAULT_PATH": "/path/to/your/vault"
-      }
-    }
-  }
-}
-```
-
-### Windsurf / Cursor / Other MCP Clients
-
-Add to your `mcp_config.json` (location varies by client):
-
-**Windsurf**: `~/.windsurf/mcp_config.json`  
-**Cursor**: `~/.cursor/mcp_config.json`
-
-```json
-{
-  "mcpServers": {
-    "obsidian": {
-      "command": "node",
-      "args": ["/path/to/obsidian_mcp/dist/index.js"],
-      "env": {
-        "OBSIDIAN_API_KEY": "your-api-key-here",
-        "OBSIDIAN_VAULT_PATH": "/path/to/your/vault"
-      }
-    }
-  }
-}
-```
-
 ### Using npx (Recommended)
+
+Use `npx` for the simplest setup:
 
 ```json
 {
   "mcpServers": {
     "obsidian": {
       "command": "npx",
-      "args": ["@connorbritain/obsidian-mcp-server"],
+      "args": ["-y", "@connorbritain/obsidian-mcp-server"],
       "env": {
         "OBSIDIAN_API_KEY": "your-api-key-here",
         "OBSIDIAN_VAULT_PATH": "/path/to/your/vault"
@@ -111,6 +72,34 @@ Add to your `mcp_config.json` (location varies by client):
   }
 }
 ```
+
+### Using Local Build (Development)
+
+If running from source:
+
+```json
+{
+  "mcpServers": {
+    "obsidian": {
+      "command": "node",
+      "args": ["/absolute/path/to/obsidian-mcp-server/dist/index.js"],
+      "env": {
+        "OBSIDIAN_API_KEY": "your-api-key-here",
+        "OBSIDIAN_VAULT_PATH": "/path/to/your/vault"
+      }
+    }
+  }
+}
+```
+
+### Config File Locations
+
+| Client | Config Path |
+|--------|-------------|
+| **Claude Desktop (Windows)** | `%APPDATA%\Claude\claude_desktop_config.json` |
+| **Claude Desktop (Mac/Linux)** | `~/.config/claude/claude_desktop_config.json` |
+| **Windsurf** | `~/.windsurf/mcp_config.json` |
+| **Cursor** | `~/.cursor/mcp_config.json` |
 
 ## Available Tools
 

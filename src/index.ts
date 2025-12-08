@@ -9,6 +9,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  CallToolResult,
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { getConfig } from './config.js';
@@ -16,7 +17,7 @@ import { ObsidianRestService } from './services/obsidian-rest.js';
 import { GraphService } from './services/graph-service.js';
 import { SmartConnectionsService } from './services/smart-connections.js';
 import { ALL_TOOLS } from './tools/index.js';
-import type { ToolResult, Config } from './types.js';
+import type { Config } from './types.js';
 
 class ObsidianMCPServer {
   private server: Server;
@@ -66,7 +67,7 @@ class ObsidianMCPServer {
   private async handleToolCall(
     name: string,
     args: Record<string, unknown>
-  ): Promise<ToolResult> {
+  ): Promise<CallToolResult> {
     switch (name) {
       case 'list_files_in_vault': {
         const files = await this.obsidianRest.listFilesInVault();
