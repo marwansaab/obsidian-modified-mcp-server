@@ -1,4 +1,4 @@
-# @connorbritain/obsidian-mcp-server
+# Obsidian MCP Server
 
 [![npm version](https://img.shields.io/npm/v/@connorbritain/obsidian-mcp-server.svg)](https://www.npmjs.com/package/@connorbritain/obsidian-mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -32,7 +32,7 @@ npm install -g @connorbritain/obsidian-mcp-server
 ### From source
 
 ```bash
-git clone https://github.com/connorbritain/obsidian-mcp-server.git
+git clone https://github.com/ConnorBritain/obsidian-mcp-server.git
 cd obsidian-mcp-server
 npm install
 npm run build

@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/connorbritain/obsidian-mcp-server"
+    "url": "git+https://github.com/ConnorBritain/obsidian-mcp-server.git"
   },
   "keywords": [
     "mcp",
@@ -25,9 +25,9 @@
   "author": "Connor Britain",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/connorbritain/obsidian-mcp-server/issues"
+    "url": "https://github.com/ConnorBritain/obsidian-mcp-server/issues"
   },
-  "homepage": "https://github.com/connorbritain/obsidian-mcp-server#readme",
+  "homepage": "https://github.com/ConnorBritain/obsidian-mcp-server#readme",
   "publishConfig": {
     "access": "public"
   },
@@ -58,7 +58,6 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
-    "@types/graphology-communities-louvain": "^0.8.0",
     "eslint": "^9.12.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
