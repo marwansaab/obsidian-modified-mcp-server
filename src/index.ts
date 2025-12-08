@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * obsidian-mcp-server entry point
  * MCP server for Obsidian with core tools, graph analytics, and semantic search
@@ -32,10 +31,17 @@ class ObsidianMCPServer {
     this.graphService = new GraphService(this.config);
     this.smartConnections = new SmartConnectionsService(this.config);
 
-    this.server = new Server({
-      name: 'obsidian-mcp-server',
-      version: '0.1.0',
-    });
+    this.server = new Server(
+      {
+        name: 'obsidian-mcp-server',
+        version: '0.1.0',
+      },
+      {
+        capabilities: {
+          tools: {},
+        },
+      }
+    );
 
     this.setupHandlers();
   }
@@ -104,22 +110,24 @@ class ObsidianMCPServer {
         };
       }
 
-      case 'patch_content': {
-        const { filepath, operation, targetType, target, content } = args as {
-          filepath: string;
-          operation: string;
-          targetType: string;
-          target: string;
-          content: string;
-        };
-        if (!filepath || !operation || !targetType || !target || !content) {
-          throw new Error('filepath, operation, targetType, target, and content are required');
-        }
-        await this.obsidianRest.patchContent(filepath, operation, targetType, target, content);
-        return {
-          content: [{ type: 'text', text: 'Content patched successfully' }],
-        };
-      }
+      // DISABLED: patch_content handler commented out due to known bugs in Obsidian Local REST API
+      // See: https://github.com/coddingtonbear/obsidian-local-rest-api/issues/146
+      // case 'patch_content': {
+      //   const { filepath, operation, targetType, target, content } = args as {
+      //     filepath: string;
+      //     operation: string;
+      //     targetType: string;
+      //     target: string;
+      //     content: string;
+      //   };
+      //   if (!filepath || !operation || !targetType || !target || !content) {
+      //     throw new Error('filepath, operation, targetType, target, and content are required');
+      //   }
+      //   await this.obsidianRest.patchContent(filepath, operation, targetType, target, content);
+      //   return {
+      //     content: [{ type: 'text', text: 'Content patched successfully' }],
+      //   };
+      // }
 
       case 'append_content': {
         const filepath = args.filepath as string;

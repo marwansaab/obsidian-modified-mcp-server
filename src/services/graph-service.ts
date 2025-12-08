@@ -5,7 +5,7 @@
 
 import Graph from 'graphology';
 import { bidirectional } from 'graphology-shortest-path';
-import { pagerank } from 'graphology-metrics/centrality';
+import pagerank from 'graphology-metrics/centrality/pagerank.js';
 import louvain from 'graphology-communities-louvain';
 import { promises as fs } from 'node:fs';
 import { join, relative, basename, extname } from 'node:path';

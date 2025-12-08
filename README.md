@@ -7,7 +7,7 @@ TypeScript MCP server for Obsidian with core vault operations, graph analytics, 
 
 ## Features
 
-- **Core Tools**: Read, write, search, patch, append, delete files in your Obsidian vault
+- **Core Tools**: Read, write, search, append, delete files in your Obsidian vault
 - **Periodic Notes**: Access daily, weekly, monthly notes and recent changes
 - **Advanced Search**: JsonLogic queries for complex filtering
 - **Graph Tools**: Orphan detection, centrality analysis, cluster detection, path finding
@@ -119,7 +119,9 @@ If running from source:
 |------|-------------|
 | `append_content` | Append to file (creates if missing) |
 | `put_content` | Overwrite file content |
-| `patch_content` | Insert content relative to heading/block |
+| ~~`patch_content`~~ | ⚠️ **Disabled**: Insert content relative to heading/block (awaiting Obsidian REST API fix - [see issue #146](https://github.com/coddingtonbear/obsidian-local-rest-api/issues/146)) |
+
+> **Note**: The `patch_content` tool is currently disabled due to known bugs in the Obsidian Local REST API plugin. Use the read-modify-write pattern with `get_file_contents` + `put_content` as a reliable alternative.
 
 ### Search
 
