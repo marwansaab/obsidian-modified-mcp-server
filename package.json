@@ -1,6 +1,6 @@
 {
   "name": "@connorbritain/obsidian-mcp-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript MCP server for Obsidian with core tools, graph analytics, and semantic search",
   "type": "module",
   "main": "dist/index.js",
