@@ -80,6 +80,60 @@ Set the following environment variables:
 
 Each tool in the MCP server now accepts an optional `vaultId` argument. When omitted, the server uses `OBSIDIAN_DEFAULT_VAULT` (or the first defined vault). This allows a single MCP session to read/write multiple vaults just by specifying which vault to target in the tool call.
 
+### Multi-Vault Port Configuration
+
+> **Important:** When running multiple Obsidian vaults simultaneously, each vault's Local REST API plugin must listen on a **unique port**. By default, all vaults use port `27124`, which causes conflicts—only one vault can bind to a port at a time, and requests to other vaults will fail with authorization errors.
+
+#### Step 1: Assign Unique Ports in Obsidian
+
+For each vault, open **Settings → Community Plugins → Local REST API** and scroll to **Advanced Settings**:
+
+1. Set **Encrypted (HTTPS) Server Port** to a unique value (e.g., `27124`, `27125`, `27126`, `27127`)
+2. Toggle the plugin off and back on (or restart Obsidian) to apply the change
+3. Copy the **API Key** shown in the plugin settings
+
+#### Step 2: Update Your Vaults JSON
+
+In your `obsidian-vaults.json` file (or `OBSIDIAN_VAULTS_JSON` env var), specify the `port` for each vault to match what you configured in the plugin:
+
+```json
+[
+  {
+    "id": "vault_one",
+    "apiKey": "your-api-key-for-vault-one",
+    "port": 27124,
+    "vaultPath": "C:/Users/you/Obsidian/vault_one"
+  },
+  {
+    "id": "vault_two",
+    "apiKey": "your-api-key-for-vault-two",
+    "port": 27125,
+    "vaultPath": "C:/Users/you/Obsidian/vault_two"
+  },
+  {
+    "id": "vault_three",
+    "apiKey": "your-api-key-for-vault-three",
+    "port": 27126,
+    "vaultPath": "C:/Users/you/Obsidian/vault_three"
+  }
+]
+```
+
+#### Step 3: Restart Your MCP Client
+
+After updating the JSON file, restart your MCP client (Windsurf, Claude Desktop, etc.) so it reloads the configuration with the new ports.
+
+#### Verifying Connectivity
+
+You can test each vault's API directly with curl:
+
+```bash
+# Replace PORT and API_KEY for each vault
+curl -k -H "Authorization: Bearer YOUR_API_KEY" https://127.0.0.1:PORT/vault/
+```
+
+A successful response returns a JSON object with the vault's file listing. If you receive `40101 Authorization required`, the API key doesn't match. If you receive `40400 Not Found`, the plugin isn't fully initialized on that port—try toggling it off/on or restarting the vault.
+
 ## MCP Client Configuration
 
 ### Using npx (Recommended)
