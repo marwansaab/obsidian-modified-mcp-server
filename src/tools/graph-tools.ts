@@ -10,7 +10,12 @@ export const GRAPH_TOOLS: Tool[] = [
     description: 'Get overview statistics about the vault: total notes, links, orphans, tags, clusters.',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
+      },
     },
   },
   {
@@ -22,6 +27,10 @@ export const GRAPH_TOOLS: Tool[] = [
         includeBacklinks: {
           type: 'boolean',
           description: 'Consider backlinks when determining orphan status (default: true).',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
     },
@@ -39,6 +48,10 @@ export const GRAPH_TOOLS: Tool[] = [
         depth: {
           type: 'number',
           description: 'How many levels of connections to traverse (default: 1).',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
       required: ['filepath'],
@@ -62,6 +75,10 @@ export const GRAPH_TOOLS: Tool[] = [
           type: 'number',
           description: 'Maximum path length to search (default: 5).',
         },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
       },
       required: ['source', 'target'],
     },
@@ -81,6 +98,10 @@ export const GRAPH_TOOLS: Tool[] = [
           enum: ['links', 'backlinks', 'pagerank'],
           description: 'Metric to rank by (default: backlinks).',
         },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
       },
     },
   },
@@ -93,6 +114,10 @@ export const GRAPH_TOOLS: Tool[] = [
         minClusterSize: {
           type: 'number',
           description: 'Minimum notes per cluster (default: 3).',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
     },
@@ -110,6 +135,10 @@ export const GRAPH_TOOLS: Tool[] = [
         includeFiles: {
           type: 'boolean',
           description: 'Include files in the tree, not just folders (default: false).',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
     },

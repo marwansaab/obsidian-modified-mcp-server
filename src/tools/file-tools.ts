@@ -10,7 +10,12 @@ export const FILE_TOOLS: Tool[] = [
     description: 'Lists all files and directories in the root of your Obsidian vault.',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
+      },
       required: [],
     },
   },
@@ -23,6 +28,10 @@ export const FILE_TOOLS: Tool[] = [
         dirpath: {
           type: 'string',
           description: 'Path to the directory (relative to vault root). Empty directories are not returned.',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
       required: ['dirpath'],
@@ -37,6 +46,10 @@ export const FILE_TOOLS: Tool[] = [
         filepath: {
           type: 'string',
           description: 'Path to the file (relative to vault root).',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
       required: ['filepath'],
@@ -53,6 +66,10 @@ export const FILE_TOOLS: Tool[] = [
           items: { type: 'string' },
           description: 'List of file paths to read (relative to vault root).',
         },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
       },
       required: ['filepaths'],
     },
@@ -66,6 +83,10 @@ export const FILE_TOOLS: Tool[] = [
         filepath: {
           type: 'string',
           description: 'Path to the file or directory to delete (relative to vault root).',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
       required: ['filepath'],

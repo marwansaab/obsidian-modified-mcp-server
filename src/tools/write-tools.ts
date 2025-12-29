@@ -19,6 +19,10 @@ export const WRITE_TOOLS: Tool[] = [
           type: 'string',
           description: 'The markdown content to append.',
         },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
       },
       required: ['filepath', 'content'],
     },
@@ -36,6 +40,10 @@ export const WRITE_TOOLS: Tool[] = [
         content: {
           type: 'string',
           description: 'The markdown content to write.',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
       required: ['filepath', 'content'],

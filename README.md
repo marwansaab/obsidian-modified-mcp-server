@@ -44,13 +44,41 @@ Set the following environment variables:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `OBSIDIAN_API_KEY` | Yes | - | API key from Local REST API plugin settings |
+| `OBSIDIAN_API_KEY` | Yes* | - | API key from Local REST API plugin settings (used when multi-vault JSON is not supplied) |
 | `OBSIDIAN_HOST` | No | `127.0.0.1` | Obsidian REST API host |
 | `OBSIDIAN_PORT` | No | `27124` | Obsidian REST API port |
 | `OBSIDIAN_PROTOCOL` | No | `https` | `http` or `https` |
 | `OBSIDIAN_VAULT_PATH` | No | - | Path to vault (required for graph tools) |
 | `SMART_CONNECTIONS_PORT` | No | - | Port for Smart Connections API |
 | `GRAPH_CACHE_TTL` | No | `300` | Graph cache TTL in seconds |
+| `OBSIDIAN_VAULTS_JSON` | No | - | JSON string describing one or more vaults. Overrides the single `OBSIDIAN_API_KEY` style config. |
+| `OBSIDIAN_VAULTS_FILE` | No | - | Path to a JSON file describing one or more vaults (same shape as `OBSIDIAN_VAULTS_JSON`). |
+| `OBSIDIAN_DEFAULT_VAULT` | No | first defined | Name/ID of the vault to use when a tool call omits `vaultId`. |
+
+> **Multi-vault note:** If neither `OBSIDIAN_VAULTS_JSON` nor `OBSIDIAN_VAULTS_FILE` is provided, the legacy single-vault env vars (`OBSIDIAN_API_KEY`, `OBSIDIAN_HOST`, etc.) are used to create a `default` vault entry automatically.
+
+### Example `OBSIDIAN_VAULTS_JSON`
+
+```json
+[
+  {
+    "id": "work",
+    "apiKey": "work-api-key",
+    "host": "127.0.0.1",
+    "port": 27124,
+    "protocol": "https",
+    "vaultPath": "C:/Users/you/Obsidian/work",
+    "smartConnectionsPort": 29327
+  },
+  {
+    "id": "personal",
+    "apiKey": "personal-api-key",
+    "vaultPath": "C:/Users/you/Obsidian/personal"
+  }
+]
+```
+
+Each tool in the MCP server now accepts an optional `vaultId` argument. When omitted, the server uses `OBSIDIAN_DEFAULT_VAULT` (or the first defined vault). This allows a single MCP session to read/write multiple vaults just by specifying which vault to target in the tool call.
 
 ## MCP Client Configuration
 
@@ -66,7 +94,9 @@ Use `npx` for the simplest setup:
       "args": ["-y", "@connorbritain/obsidian-mcp-server"],
       "env": {
         "OBSIDIAN_API_KEY": "your-api-key-here",
-        "OBSIDIAN_VAULT_PATH": "/path/to/your/vault"
+        "OBSIDIAN_VAULT_PATH": "/path/to/your/vault",
+        "OBSIDIAN_VAULTS_FILE": "C:/path/to/vaults.json",
+        "OBSIDIAN_DEFAULT_VAULT": "work"
       }
     }
   }
@@ -85,7 +115,8 @@ If running from source:
       "args": ["/absolute/path/to/obsidian-mcp-server/dist/index.js"],
       "env": {
         "OBSIDIAN_API_KEY": "your-api-key-here",
-        "OBSIDIAN_VAULT_PATH": "/path/to/your/vault"
+        "OBSIDIAN_VAULT_PATH": "/path/to/your/vault",
+        "OBSIDIAN_VAULTS_JSON": "[{\"id\":\"work\",\"apiKey\":\"...\",\"vaultPath\":\"/work\"}]"
       }
     }
   }
@@ -102,6 +133,8 @@ If running from source:
 | **Cursor** | `~/.cursor/mcp_config.json` |
 
 ## Available Tools
+
+All tools accept an optional `vaultId` argument. If omitted, the server uses the default vault from your configuration. This lets you read/write multiple Obsidian vaults within the same MCP session.
 
 ### Core File Operations
 

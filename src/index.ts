@@ -10,26 +10,47 @@ import {
   ListToolsRequestSchema,
   CallToolResult,
 } from '@modelcontextprotocol/sdk/types.js';
+import { readdir, readFile } from 'node:fs/promises';
+import { join, relative, extname } from 'node:path';
 
 import { getConfig } from './config.js';
-import { ObsidianRestService } from './services/obsidian-rest.js';
 import { GraphService } from './services/graph-service.js';
+import { ObsidianRestService } from './services/obsidian-rest.js';
 import { SmartConnectionsService } from './services/smart-connections.js';
 import { ALL_TOOLS } from './tools/index.js';
-import type { Config } from './types.js';
+
+import type { Config, VaultConfig } from './types.js';
+
+
+type PatternSearchScope = {
+  folders?: string[];
+  filePattern?: string;
+};
+
+type PatternSearchOptions = {
+  caseSensitive?: boolean;
+  contextLines?: number;
+  maxMatches?: number;
+};
+
+type PatternSearchResult = {
+  vaultId: string;
+  file: string;
+  line: number;
+  pattern: string;
+  match: string;
+  context: string;
+};
 
 class ObsidianMCPServer {
   private server: Server;
-  private obsidianRest: ObsidianRestService;
-  private graphService: GraphService;
-  private smartConnections: SmartConnectionsService;
   private config: Config;
+  private restServices = new Map<string, ObsidianRestService>();
+  private graphServices = new Map<string, GraphService>();
+  private semanticServices = new Map<string, SmartConnectionsService>();
 
   constructor() {
     this.config = getConfig();
-    this.obsidianRest = new ObsidianRestService(this.config);
-    this.graphService = new GraphService(this.config);
-    this.smartConnections = new SmartConnectionsService(this.config);
 
     this.server = new Server(
       {
@@ -44,6 +65,173 @@ class ObsidianMCPServer {
     );
 
     this.setupHandlers();
+  }
+
+  private getVaultConfig(vaultId?: string): VaultConfig {
+    const id = vaultId ?? this.config.defaultVaultId;
+    const vault = this.config.vaults[id];
+    if (!vault) {
+      throw new Error(`Vault "${id}" is not configured`);
+    }
+    return vault;
+  }
+
+  private getRestService(vaultId?: string): ObsidianRestService {
+    const vault = this.getVaultConfig(vaultId);
+    if (!this.restServices.has(vault.id)) {
+      this.restServices.set(vault.id, new ObsidianRestService(vault));
+    }
+    return this.restServices.get(vault.id)!;
+  }
+
+  private getGraphService(vaultId?: string): GraphService {
+    const vault = this.getVaultConfig(vaultId);
+    if (!vault.vaultPath) {
+      throw new Error(`Vault "${vault.id}" does not have vaultPath configured (required for graph tools).`);
+    }
+    if (!this.graphServices.has(vault.id)) {
+      this.graphServices.set(vault.id, new GraphService(vault, this.config.graphCacheTtl));
+    }
+    return this.graphServices.get(vault.id)!;
+  }
+
+  private getSemanticService(vaultId?: string): SmartConnectionsService {
+    const vault = this.getVaultConfig(vaultId);
+    if (!vault.smartConnectionsPort) {
+      throw new Error(
+        `Vault "${vault.id}" does not have smartConnectionsPort configured (required for semantic tools).`
+      );
+    }
+    if (!this.semanticServices.has(vault.id)) {
+      this.semanticServices.set(vault.id, new SmartConnectionsService(vault));
+    }
+    return this.semanticServices.get(vault.id)!;
+  }
+
+  private resolveVaultId(args: Record<string, unknown>): string {
+    const requested = (args.vaultId as string | undefined)?.trim();
+    return this.getVaultConfig(requested).id;
+  }
+
+  private globToRegex(pattern: string): RegExp {
+    const escaped = pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '.*')
+      .replace(/\?/g, '.');
+    return new RegExp(`^${escaped}$`, 'i');
+  }
+
+  private async runPatternSearch(
+    vault: VaultConfig,
+    patterns: string[],
+    scope?: PatternSearchScope,
+    options?: PatternSearchOptions
+  ): Promise<PatternSearchResult[]> {
+    if (!vault.vaultPath) {
+      throw new Error(`pattern_search requires vaultPath to be configured for vault "${vault.id}".`);
+    }
+
+    const baseDir = vault.vaultPath;
+    const folders =
+      scope?.folders && Array.isArray(scope.folders) && scope.folders.length > 0
+        ? scope.folders
+            .map((folder) => folder?.trim())
+            .filter((folder): folder is string => !!folder)
+        : ['.'];
+    const filePatternRegex = scope?.filePattern ? this.globToRegex(scope.filePattern) : null;
+    const caseSensitive = options?.caseSensitive ?? false;
+    const regexFlags = caseSensitive ? 'g' : 'gi';
+    const contextLines = options?.contextLines ?? 2;
+    const maxMatches = options?.maxMatches && options.maxMatches > 0 ? options.maxMatches : 100;
+
+    const filesToSearch: string[] = [];
+
+    const walkDir = async (dir: string) => {
+      let entries;
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+
+      for (const entry of entries) {
+        if (entry.name.startsWith('.')) continue;
+        const absPath = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await walkDir(absPath);
+        } else if (extname(entry.name).toLowerCase() === '.md') {
+          const relPath = relative(baseDir, absPath).replace(/\\/g, '/');
+          if (!filePatternRegex || filePatternRegex.test(relPath)) {
+            filesToSearch.push(absPath);
+          }
+        }
+      }
+    };
+
+    for (const folder of folders) {
+      const absFolder = join(baseDir, folder);
+      await walkDir(absFolder);
+      if (filesToSearch.length >= maxMatches) break;
+    }
+
+    const compiledPatterns = patterns.map((pattern) => {
+      try {
+        // Validate regex
+        new RegExp(pattern);
+        return pattern;
+      } catch (error) {
+        throw new Error(`Invalid regex pattern "${pattern}": ${(error as Error).message}`);
+      }
+    });
+
+    const results: PatternSearchResult[] = [];
+
+    for (const absPath of filesToSearch) {
+      if (results.length >= maxMatches) break;
+      let content: string;
+      try {
+        content = await readFile(absPath, 'utf-8');
+      } catch {
+        continue;
+      }
+
+      const relPath = relative(baseDir, absPath).replace(/\\/g, '/');
+      const lines = content.split(/\r?\n/);
+
+      for (let lineIndex = 0; lineIndex < lines.length && results.length < maxMatches; lineIndex++) {
+        const line = lines[lineIndex];
+
+        for (const pattern of compiledPatterns) {
+          const regex = new RegExp(pattern, regexFlags);
+          let match: RegExpExecArray | null;
+
+          while ((match = regex.exec(line)) !== null) {
+            const snippetStart = Math.max(0, lineIndex - contextLines);
+            const snippetEnd = Math.min(lines.length - 1, lineIndex + contextLines);
+            const context = lines.slice(snippetStart, snippetEnd + 1).join('\n');
+
+            results.push({
+              vaultId: vault.id,
+              file: relPath,
+              line: lineIndex + 1,
+              pattern,
+              match: match[0],
+              context,
+            });
+
+            if (results.length >= maxMatches) break;
+            if (match[0].length === 0) {
+              // Avoid infinite loops on zero-length matches
+              regex.lastIndex++;
+            }
+          }
+
+          if (results.length >= maxMatches) break;
+        }
+      }
+    }
+
+    return results;
   }
 
   private setupHandlers(): void {
@@ -74,9 +262,13 @@ class ObsidianMCPServer {
     name: string,
     args: Record<string, unknown>
   ): Promise<CallToolResult> {
+    const vaultId = this.resolveVaultId(args);
+    const vault = this.getVaultConfig(vaultId);
+    const rest = this.getRestService(vaultId);
+
     switch (name) {
       case 'list_files_in_vault': {
-        const files = await this.obsidianRest.listFilesInVault();
+        const files = await rest.listFilesInVault();
         return {
           content: [{ type: 'text', text: JSON.stringify(files, null, 2) }],
         };
@@ -85,7 +277,7 @@ class ObsidianMCPServer {
       case 'list_files_in_dir': {
         const dirpath = args.dirpath as string;
         if (!dirpath) throw new Error('dirpath is required');
-        const files = await this.obsidianRest.listFilesInDir(dirpath);
+        const files = await rest.listFilesInDir(dirpath);
         return {
           content: [{ type: 'text', text: JSON.stringify(files, null, 2) }],
         };
@@ -94,7 +286,7 @@ class ObsidianMCPServer {
       case 'get_file_contents': {
         const filepath = args.filepath as string;
         if (!filepath) throw new Error('filepath is required');
-        const content = await this.obsidianRest.getFileContents(filepath);
+        const content = await rest.getFileContents(filepath);
         return {
           content: [{ type: 'text', text: content }],
         };
@@ -104,7 +296,7 @@ class ObsidianMCPServer {
         const query = args.query as string;
         if (!query) throw new Error('query is required');
         const contextLength = (args.contextLength as number) ?? 100;
-        const results = await this.obsidianRest.search(query, contextLength);
+        const results = await rest.search(query, contextLength);
         return {
           content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
         };
@@ -133,7 +325,7 @@ class ObsidianMCPServer {
         const filepath = args.filepath as string;
         const content = args.content as string;
         if (!filepath || !content) throw new Error('filepath and content are required');
-        await this.obsidianRest.appendContent(filepath, content);
+        await rest.appendContent(filepath, content);
         return {
           content: [{ type: 'text', text: 'Content appended successfully' }],
         };
@@ -143,7 +335,7 @@ class ObsidianMCPServer {
         const filepath = args.filepath as string;
         const content = args.content as string;
         if (!filepath || !content) throw new Error('filepath and content are required');
-        await this.obsidianRest.putContent(filepath, content);
+        await rest.putContent(filepath, content);
         return {
           content: [{ type: 'text', text: 'Content written successfully' }],
         };
@@ -152,7 +344,7 @@ class ObsidianMCPServer {
       case 'delete_file': {
         const filepath = args.filepath as string;
         if (!filepath) throw new Error('filepath is required');
-        await this.obsidianRest.deleteFile(filepath);
+        await rest.deleteFile(filepath);
         return {
           content: [{ type: 'text', text: 'File deleted successfully' }],
         };
@@ -161,7 +353,7 @@ class ObsidianMCPServer {
       case 'batch_get_file_contents': {
         const filepaths = args.filepaths as string[];
         if (!filepaths || !Array.isArray(filepaths)) throw new Error('filepaths array is required');
-        const content = await this.obsidianRest.getBatchFileContents(filepaths);
+        const content = await rest.getBatchFileContents(filepaths);
         return {
           content: [{ type: 'text', text: content }],
         };
@@ -170,7 +362,7 @@ class ObsidianMCPServer {
       case 'complex_search': {
         const query = args.query as Record<string, unknown>;
         if (!query) throw new Error('query is required');
-        const results = await this.obsidianRest.searchJson(query);
+        const results = await rest.searchJson(query);
         return {
           content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
         };
@@ -180,7 +372,7 @@ class ObsidianMCPServer {
         const period = args.period as string;
         const type = (args.type as string) ?? 'content';
         if (!period) throw new Error('period is required');
-        const content = await this.obsidianRest.getPeriodicNote(period, type);
+        const content = await rest.getPeriodicNote(period, type);
         return {
           content: [{ type: 'text', text: content }],
         };
@@ -191,7 +383,7 @@ class ObsidianMCPServer {
         const limit = (args.limit as number) ?? 5;
         const includeContent = (args.include_content as boolean) ?? false;
         if (!period) throw new Error('period is required');
-        const results = await this.obsidianRest.getRecentPeriodicNotes(period, limit, includeContent);
+        const results = await rest.getRecentPeriodicNotes(period, limit, includeContent);
         return {
           content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
         };
@@ -200,14 +392,14 @@ class ObsidianMCPServer {
       case 'get_recent_changes': {
         const limit = (args.limit as number) ?? 10;
         const days = (args.days as number) ?? 90;
-        const results = await this.obsidianRest.getRecentChanges(limit, days);
+        const results = await rest.getRecentChanges(limit, days);
         return {
           content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
         };
       }
 
       case 'get_active_file': {
-        const content = await this.obsidianRest.getActiveFile();
+        const content = await rest.getActiveFile();
         return {
           content: [{ type: 'text', text: content }],
         };
@@ -216,14 +408,14 @@ class ObsidianMCPServer {
       case 'open_file': {
         const filepath = args.filepath as string;
         if (!filepath) throw new Error('filepath is required');
-        await this.obsidianRest.openFile(filepath);
+        await rest.openFile(filepath);
         return {
           content: [{ type: 'text', text: 'File opened successfully' }],
         };
       }
 
       case 'list_commands': {
-        const commands = await this.obsidianRest.listCommands();
+        const commands = await rest.listCommands();
         return {
           content: [{ type: 'text', text: JSON.stringify(commands, null, 2) }],
         };
@@ -235,7 +427,7 @@ class ObsidianMCPServer {
         const results: string[] = [];
         for (const cmd of commands) {
           try {
-            await this.obsidianRest.executeCommand(cmd);
+            await rest.executeCommand(cmd);
             results.push(`✓ ${cmd}`);
           } catch (err) {
             results.push(`✗ ${cmd}: ${err instanceof Error ? err.message : String(err)}`);
@@ -246,121 +438,22 @@ class ObsidianMCPServer {
         };
       }
 
-      // Pattern search - requires local file access
       case 'pattern_search': {
-        if (!this.config.vaultPath) {
-          return {
-            content: [{ type: 'text', text: 'Pattern search requires OBSIDIAN_VAULT_PATH to be set.' }],
-            isError: true,
-          };
+        const patterns = args.patterns as string[];
+        if (!patterns || !Array.isArray(patterns) || patterns.length === 0) {
+          throw new Error('patterns array is required');
         }
-        // TODO: Implement pattern search using vault path + regex
+        const scope = args.scope as PatternSearchScope | undefined;
+        const options = args.options as PatternSearchOptions | undefined;
+        const results = await this.runPatternSearch(vault, patterns, scope, options);
         return {
-          content: [{ type: 'text', text: 'Pattern search implementation pending.' }],
-          isError: true,
+          content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
         };
       }
 
-      // Graph tools
-      case 'get_vault_stats': {
-        if (!this.config.vaultPath) {
-          return { content: [{ type: 'text', text: 'OBSIDIAN_VAULT_PATH required for graph tools.' }], isError: true };
-        }
-        const stats = await this.graphService.getVaultStats();
-        return { content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }] };
-      }
-
-      case 'find_orphan_notes': {
-        if (!this.config.vaultPath) {
-          return { content: [{ type: 'text', text: 'OBSIDIAN_VAULT_PATH required for graph tools.' }], isError: true };
-        }
-        const includeBacklinks = (args.includeBacklinks as boolean) ?? true;
-        const orphans = await this.graphService.findOrphanNotes(includeBacklinks);
-        return { content: [{ type: 'text', text: JSON.stringify(orphans, null, 2) }] };
-      }
-
-      case 'get_note_connections': {
-        if (!this.config.vaultPath) {
-          return { content: [{ type: 'text', text: 'OBSIDIAN_VAULT_PATH required for graph tools.' }], isError: true };
-        }
-        const filepath = args.filepath as string;
-        if (!filepath) throw new Error('filepath is required');
-        const depth = (args.depth as number) ?? 1;
-        const connections = await this.graphService.getNoteConnections(filepath, depth);
-        return { content: [{ type: 'text', text: JSON.stringify(connections, null, 2) }] };
-      }
-
-      case 'find_path_between_notes': {
-        if (!this.config.vaultPath) {
-          return { content: [{ type: 'text', text: 'OBSIDIAN_VAULT_PATH required for graph tools.' }], isError: true };
-        }
-        const source = args.source as string;
-        const target = args.target as string;
-        if (!source || !target) throw new Error('source and target are required');
-        const maxDepth = (args.maxDepth as number) ?? 5;
-        const path = await this.graphService.findPathBetweenNotes(source, target, maxDepth);
-        if (path) {
-          return { content: [{ type: 'text', text: JSON.stringify(path, null, 2) }] };
-        }
-        return { content: [{ type: 'text', text: 'No path found between notes.' }] };
-      }
-
-      case 'get_most_connected_notes': {
-        if (!this.config.vaultPath) {
-          return { content: [{ type: 'text', text: 'OBSIDIAN_VAULT_PATH required for graph tools.' }], isError: true };
-        }
-        const limit = (args.limit as number) ?? 10;
-        const metric = (args.metric as 'links' | 'backlinks' | 'pagerank') ?? 'backlinks';
-        const connected = await this.graphService.getMostConnectedNotes(limit, metric);
-        return { content: [{ type: 'text', text: JSON.stringify(connected, null, 2) }] };
-      }
-
-      case 'detect_note_clusters': {
-        if (!this.config.vaultPath) {
-          return { content: [{ type: 'text', text: 'OBSIDIAN_VAULT_PATH required for graph tools.' }], isError: true };
-        }
-        const minClusterSize = (args.minClusterSize as number) ?? 3;
-        const clusters = await this.graphService.detectNoteClusters(minClusterSize);
-        return { content: [{ type: 'text', text: JSON.stringify(clusters, null, 2) }] };
-      }
-
-      case 'get_vault_structure': {
-        if (!this.config.vaultPath) {
-          return { content: [{ type: 'text', text: 'OBSIDIAN_VAULT_PATH required for graph tools.' }], isError: true };
-        }
-        const maxDepth = args.maxDepth as number | undefined;
-        const includeFiles = (args.includeFiles as boolean) ?? false;
-        const structure = await this.graphService.getVaultStructure(maxDepth, includeFiles);
-        return { content: [{ type: 'text', text: JSON.stringify(structure, null, 2) }] };
-      }
-
-      // Semantic tools
-      case 'semantic_search': {
-        const query = args.query as string;
-        if (!query) throw new Error('query is required');
-        const limit = (args.limit as number) ?? 10;
-        const threshold = (args.threshold as number) ?? 0.7;
-        const filters = args.filters as { folders?: string[]; excludeFolders?: string[] } | undefined;
-        const results = await this.smartConnections.search(query, {
-          limit,
-          threshold,
-          folders: filters?.folders,
-          excludeFolders: filters?.excludeFolders,
-        });
-        return { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] };
-      }
-
-      case 'find_similar_notes': {
-        const filepath = args.filepath as string;
-        if (!filepath) throw new Error('filepath is required');
-        const limit = (args.limit as number) ?? 10;
-        const threshold = (args.threshold as number) ?? 0.5;
-        const results = await this.smartConnections.findSimilar(filepath, { limit, threshold });
-        return { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] };
-      }
-
-      default:
+      default: {
         throw new Error(`Unknown tool: ${name}`);
+      }
     }
   }
 

@@ -21,6 +21,10 @@ export const PERIODIC_TOOLS: Tool[] = [
           enum: ['content', 'metadata'],
           description: 'Return type: content only or with metadata (default: content).',
         },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
       },
       required: ['period'],
     },
@@ -44,6 +48,10 @@ export const PERIODIC_TOOLS: Tool[] = [
           type: 'boolean',
           description: 'Whether to include note content (default: false).',
         },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
       },
       required: ['period'],
     },
@@ -61,6 +69,10 @@ export const PERIODIC_TOOLS: Tool[] = [
         days: {
           type: 'number',
           description: 'Only include files modified within this many days (default: 90).',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
     },

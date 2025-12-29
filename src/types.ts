@@ -94,14 +94,22 @@ export interface ToolResult {
   isError?: boolean;
 }
 
-/** Configuration options */
-export interface Config {
-  obsidianApiKey: string;
-  obsidianHost: string;
-  obsidianPort: number;
-  obsidianProtocol: 'http' | 'https';
+/** Individual vault configuration */
+export interface VaultConfig {
+  id: string;
+  apiKey: string;
+  host: string;
+  port: number;
+  protocol: 'http' | 'https';
   vaultPath?: string;
   smartConnectionsPort?: number;
+  verifySsl?: boolean;
+}
+
+/** Global configuration options */
+export interface Config {
+  defaultVaultId: string;
+  vaults: Record<string, VaultConfig>;
   graphCacheTtl: number;
   verifySsl: boolean;
 }

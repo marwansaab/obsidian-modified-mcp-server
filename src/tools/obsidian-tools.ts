@@ -10,7 +10,12 @@ export const OBSIDIAN_TOOLS: Tool[] = [
     description: 'Get the currently active file in Obsidian.',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
+      },
     },
   },
   {
@@ -23,6 +28,10 @@ export const OBSIDIAN_TOOLS: Tool[] = [
           type: 'string',
           description: 'Path to the file to open (relative to vault root).',
         },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
       },
       required: ['filepath'],
     },
@@ -32,7 +41,12 @@ export const OBSIDIAN_TOOLS: Tool[] = [
     description: 'List all available commands in Obsidian. For commands that operate on notes, open a note first.',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
+      },
     },
   },
   {
@@ -45,6 +59,10 @@ export const OBSIDIAN_TOOLS: Tool[] = [
           type: 'array',
           items: { type: 'string' },
           description: 'List of command IDs to execute.',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
       required: ['commands'],

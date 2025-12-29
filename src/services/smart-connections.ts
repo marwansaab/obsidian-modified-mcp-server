@@ -5,7 +5,8 @@
 
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { Agent } from 'node:https';
-import type { Config, SemanticResult } from '../types.js';
+
+import type { VaultConfig, SemanticResult } from '../types.js';
 
 export interface SemanticSearchOptions {
   limit?: number;
@@ -22,21 +23,23 @@ export interface SmartConnectionsStatus {
 export class SmartConnectionsService {
   private client: AxiosInstance;
   private enabled: boolean;
+  private vaultId: string;
 
-  constructor(config: Config) {
-    this.enabled = !!config.smartConnectionsPort;
+  constructor(vault: VaultConfig) {
+    this.vaultId = vault.id;
+    this.enabled = !!vault.smartConnectionsPort;
 
     // Smart Connections uses a custom endpoint registered by the Research MCP Bridge plugin
     // It's accessed via the same Obsidian REST API base URL
-    const baseURL = `${config.obsidianProtocol}://${config.obsidianHost}:${config.obsidianPort}`;
+    const baseURL = `${vault.protocol}://${vault.host}:${vault.port}`;
 
     this.client = axios.create({
       baseURL,
       headers: {
-        Authorization: `Bearer ${config.obsidianApiKey}`,
+        Authorization: `Bearer ${vault.apiKey}`,
         'Content-Type': 'application/json',
       },
-      httpsAgent: new Agent({ rejectUnauthorized: false }),
+      httpsAgent: new Agent({ rejectUnauthorized: vault.verifySsl ?? true }),
       timeout: 15000,
     });
   }
@@ -80,7 +83,7 @@ export class SmartConnectionsService {
    */
   async search(query: string, options: SemanticSearchOptions = {}): Promise<SemanticResult[]> {
     if (!this.enabled) {
-      throw new Error('Smart Connections not configured. Set SMART_CONNECTIONS_PORT.');
+      throw new Error(`Smart Connections not configured for vault "${this.vaultId}". Set smartConnectionsPort.`);
     }
 
     const filter: Record<string, unknown> = {
@@ -121,7 +124,7 @@ export class SmartConnectionsService {
    */
   async findSimilar(filepath: string, options: SemanticSearchOptions = {}): Promise<SemanticResult[]> {
     if (!this.enabled) {
-      throw new Error('Smart Connections not configured. Set SMART_CONNECTIONS_PORT.');
+      throw new Error(`Smart Connections not configured for vault "${this.vaultId}". Set smartConnectionsPort.`);
     }
 
     try {

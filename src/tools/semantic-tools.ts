@@ -38,6 +38,10 @@ export const SEMANTIC_TOOLS: Tool[] = [
             },
           },
         },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
       },
       required: ['query'],
     },
@@ -59,6 +63,10 @@ export const SEMANTIC_TOOLS: Tool[] = [
         threshold: {
           type: 'number',
           description: 'Similarity threshold 0-1 (default: 0.5).',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
       required: ['filepath'],

@@ -5,23 +5,24 @@
 
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import https from 'node:https';
-import type { Config, SearchResult } from '../types.js';
+
+import type { SearchResult, VaultConfig } from '../types.js';
 
 export class ObsidianRestService {
   private client: AxiosInstance;
-  private config: Config;
+  private vault: VaultConfig;
 
-  constructor(config: Config) {
-    this.config = config;
+  constructor(vault: VaultConfig) {
+    this.vault = vault;
 
     const httpsAgent = new https.Agent({
-      rejectUnauthorized: config.verifySsl,
+      rejectUnauthorized: vault.verifySsl ?? true,
     });
 
     this.client = axios.create({
-      baseURL: `${config.obsidianProtocol}://${config.obsidianHost}:${config.obsidianPort}`,
+      baseURL: `${vault.protocol}://${vault.host}:${vault.port}`,
       headers: {
-        Authorization: `Bearer ${config.obsidianApiKey}`,
+        Authorization: `Bearer ${vault.apiKey}`,
       },
       timeout: 10000,
       httpsAgent,

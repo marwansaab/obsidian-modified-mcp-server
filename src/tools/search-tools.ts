@@ -19,6 +19,10 @@ export const SEARCH_TOOLS: Tool[] = [
           type: 'number',
           description: 'Number of characters of context around each match (default: 100).',
         },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
+        },
       },
       required: ['query'],
     },
@@ -32,6 +36,10 @@ export const SEARCH_TOOLS: Tool[] = [
         query: {
           type: 'object',
           description: 'JsonLogic query object. Example: {"glob": ["*.md", {"var": "path"}]}',
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
       required: ['query'],
@@ -78,6 +86,10 @@ export const SEARCH_TOOLS: Tool[] = [
               description: 'Maximum matches to return.',
             },
           },
+        },
+        vaultId: {
+          type: 'string',
+          description: 'Optional vault ID (defaults to configured default vault).',
         },
       },
       required: ['patterns'],

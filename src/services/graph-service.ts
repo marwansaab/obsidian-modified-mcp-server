@@ -4,18 +4,19 @@
  */
 
 import Graph from 'graphology';
-import { bidirectional } from 'graphology-shortest-path';
-import pagerank from 'graphology-metrics/centrality/pagerank.js';
 import louvain from 'graphology-communities-louvain';
+import pagerank from 'graphology-metrics/centrality/pagerank.js';
+import { bidirectional } from 'graphology-shortest-path';
 import { promises as fs } from 'node:fs';
 import { join, relative, basename, extname } from 'node:path';
-import type { Config, GraphNode, GraphEdge, VaultStats, NoteConnections } from '../types.js';
+
+import type { VaultConfig, VaultStats, NoteConnections } from '../types.js';
 
 // Regex patterns for parsing markdown
 const WIKILINK_REGEX = /\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]+)?\]\]/g;
 const MARKDOWN_LINK_REGEX = /\[([^\]]+)\]\(([^)]+\.md)\)/g;
 const TAG_REGEX = /#([a-zA-Z][a-zA-Z0-9_/-]*)/g;
-const EMBED_REGEX = /!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+// const EMBED_REGEX = /!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
 
 export interface GraphStats {
   totalNotes: number;
@@ -33,15 +34,17 @@ export interface ClusterInfo {
 
 export class GraphService {
   private graph: Graph;
+  private vaultId: string;
   private vaultPath: string;
   private initialized = false;
   private lastBuildTime = 0;
   private cacheTTL: number;
   private noteTags: Map<string, string[]> = new Map();
 
-  constructor(config: Config) {
-    this.vaultPath = config.vaultPath || '';
-    this.cacheTTL = (config.graphCacheTtl || 300) * 1000; // Convert to ms
+  constructor(vault: VaultConfig, cacheTtlSeconds: number) {
+    this.vaultId = vault.id;
+    this.vaultPath = vault.vaultPath || '';
+    this.cacheTTL = (cacheTtlSeconds || 300) * 1000; // Convert to ms
     this.graph = new Graph({ type: 'directed', allowSelfLoops: false });
   }
 
@@ -58,7 +61,7 @@ export class GraphService {
    */
   async buildGraph(): Promise<void> {
     if (!this.vaultPath) {
-      throw new Error('OBSIDIAN_VAULT_PATH not configured');
+      throw new Error(`OBSIDIAN_VAULT_PATH not configured for vault "${this.vaultId}"`);
     }
 
     // Clear existing graph
@@ -273,7 +276,7 @@ export class GraphService {
   /**
    * Get connections for a specific note
    */
-  async getNoteConnections(filepath: string, depth = 1): Promise<NoteConnections> {
+  async getNoteConnections(filepath: string): Promise<NoteConnections> {
     await this.ensureGraph();
 
     // Normalize path
