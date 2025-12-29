@@ -136,6 +136,12 @@ If running from source:
 
 All tools accept an optional `vaultId` argument. If omitted, the server uses the default vault from your configuration. This lets you read/write multiple Obsidian vaults within the same MCP session.
 
+### Vault Management
+
+| Tool | Description |
+|------|-------------|
+| `list_vaults` | List all configured vaults with their IDs, capabilities, and connection info |
+
 ### Core File Operations
 
 | Tool | Description |

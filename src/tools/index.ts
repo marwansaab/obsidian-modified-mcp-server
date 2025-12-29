@@ -8,12 +8,14 @@ import { OBSIDIAN_TOOLS } from './obsidian-tools.js';
 import { PERIODIC_TOOLS } from './periodic-tools.js';
 import { SEARCH_TOOLS } from './search-tools.js';
 import { SEMANTIC_TOOLS } from './semantic-tools.js';
+import { VAULT_TOOLS } from './vault-tools.js';
 import { WRITE_TOOLS } from './write-tools.js';
 
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 /** All available tools */
 export const ALL_TOOLS: Tool[] = [
+  ...VAULT_TOOLS,
   ...FILE_TOOLS,
   ...WRITE_TOOLS,
   ...SEARCH_TOOLS,
@@ -24,6 +26,7 @@ export const ALL_TOOLS: Tool[] = [
 ];
 
 export {
+  VAULT_TOOLS,
   FILE_TOOLS,
   WRITE_TOOLS,
   SEARCH_TOOLS,

@@ -438,6 +438,33 @@ class ObsidianMCPServer {
         };
       }
 
+      case 'list_vaults': {
+        const vaults = Object.entries(this.config.vaults).map(([id, vault]) => ({
+          id,
+          isDefault: id === this.config.defaultVaultId,
+          hasVaultPath: !!vault.vaultPath,
+          hasSmartConnections: !!vault.smartConnectionsPort,
+          host: vault.host,
+          port: vault.port,
+          protocol: vault.protocol,
+        }));
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  defaultVaultId: this.config.defaultVaultId,
+                  vaults,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
       case 'pattern_search': {
         const patterns = args.patterns as string[];
         if (!patterns || !Array.isArray(patterns) || patterns.length === 0) {
