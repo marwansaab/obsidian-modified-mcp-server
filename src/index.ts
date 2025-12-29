@@ -262,6 +262,34 @@ class ObsidianMCPServer {
     name: string,
     args: Record<string, unknown>
   ): Promise<CallToolResult> {
+    // Handle list_vaults first - doesn't require vault resolution
+    if (name === 'list_vaults') {
+      const vaults = Object.entries(this.config.vaults).map(([id, vault]) => ({
+        id,
+        isDefault: id === this.config.defaultVaultId,
+        hasVaultPath: !!vault.vaultPath,
+        hasSmartConnections: !!vault.smartConnectionsPort,
+        host: vault.host,
+        port: vault.port,
+        protocol: vault.protocol,
+      }));
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                defaultVaultId: this.config.defaultVaultId,
+                vaults,
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    }
+
     const vaultId = this.resolveVaultId(args);
     const vault = this.getVaultConfig(vaultId);
     const rest = this.getRestService(vaultId);
@@ -435,33 +463,6 @@ class ObsidianMCPServer {
         }
         return {
           content: [{ type: 'text', text: results.join('\n') }],
-        };
-      }
-
-      case 'list_vaults': {
-        const vaults = Object.entries(this.config.vaults).map(([id, vault]) => ({
-          id,
-          isDefault: id === this.config.defaultVaultId,
-          hasVaultPath: !!vault.vaultPath,
-          hasSmartConnections: !!vault.smartConnectionsPort,
-          host: vault.host,
-          port: vault.port,
-          protocol: vault.protocol,
-        }));
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  defaultVaultId: this.config.defaultVaultId,
-                  vaults,
-                },
-                null,
-                2
-              ),
-            },
-          ],
         };
       }
 
