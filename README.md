@@ -1,7 +1,11 @@
-# Obsidian MCP Server
+# Obsidian Modified MCP Server
 
-[![npm version](https://img.shields.io/npm/v/@connorbritain/obsidian-mcp-server.svg)](https://www.npmjs.com/package/@connorbritain/obsidian-mcp-server)
+[![npm version](https://img.shields.io/npm/v/@marwansaab/obsidian-modified-mcp-server.svg)](https://www.npmjs.com/package/@marwansaab/obsidian-modified-mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+This is a personal fork of [`@connorbritain/obsidian-mcp-server`](https://github.com/ConnorBritain/obsidian-mcp-server) by Connor Britain. Its purpose is to mitigate wrapper-side limitations of the Local-REST-API-based MCP server — starting with re-enabling the `patch_content` tool under a structural-only path validator. Subsequent specs will add similar wrapper-level mitigations as the fork evolves.
+
+> **Status: Personal fork. External support not guaranteed; use at your own discretion.**
 
 TypeScript MCP server for Obsidian with core vault operations, graph analytics, and semantic search.
 
@@ -12,6 +16,41 @@ TypeScript MCP server for Obsidian with core vault operations, graph analytics, 
 - **Advanced Search**: JsonLogic queries for complex filtering
 - **Graph Tools**: Orphan detection, centrality analysis, cluster detection, path finding
 - **Semantic Search**: Smart Connections integration for concept-based search
+
+## Differences from upstream
+
+<!-- This section is maintained as new differences land. -->
+
+| Change | Description | Rationale |
+|---|---|---|
+| `patch_content` re-enabled | Heading/block/frontmatter PATCH tool is enabled in this fork under a structural-only path validator. | Wraps the same upstream endpoint Connor's fork disabled. The empirically-observed `40080 invalid-target` is a client-side path-mismatch (per [coddingtonbear/obsidian-local-rest-api#146](https://github.com/coddingtonbear/obsidian-local-rest-api/issues/146)), addressable by enforcing fully-qualified heading paths at the wrapper boundary. |
+
+## `patch_content` path discipline
+
+To avoid the disambiguation issue tracked in upstream issue
+[coddingtonbear/obsidian-local-rest-api#146](https://github.com/coddingtonbear/obsidian-local-rest-api/issues/146),
+this fork applies a structural validator at the MCP wrapper boundary
+**before** any HTTP call is made.
+
+- **Heading targets MUST be path-shaped.** At least two non-empty
+  `::`-separated segments, full path from the document's H1 downward.
+  Use `target: "About This Vault::Frontmatter Conventions"`, **not**
+  `target: "Frontmatter Conventions"`. Bare names are rejected with an
+  actionable error message that names the rule, quotes the offending
+  value, and shows a corrected example.
+- **Headings whose literal text contains `::`** are unreachable through
+  this tool — the validator treats every `::` as a path separator and
+  there is no escape syntax. Fall back to `get_file_contents` +
+  `put_content` for those edits.
+- **Top-level-only headings** (i.e., files with no `::`-separable
+  nesting) are also unreachable through this tool. Same fallback.
+- `block` and `frontmatter` target types pass through to the upstream
+  unchanged.
+- Upstream errors propagate verbatim with status code and message
+  preserved (no silent fallbacks).
+
+These three limitations are also stated in the MCP tool's `description`
+field, so they are visible to any caller that lists the available tools.
 
 ## Prerequisites
 
@@ -26,14 +65,14 @@ TypeScript MCP server for Obsidian with core vault operations, graph analytics, 
 ### From npm
 
 ```bash
-npm install -g @connorbritain/obsidian-mcp-server
+npm install -g @marwansaab/obsidian-modified-mcp-server
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/ConnorBritain/obsidian-mcp-server.git
-cd obsidian-mcp-server
+git clone https://github.com/marwansaab/obsidian-modified-mcp-server.git
+cd obsidian-modified-mcp-server
 npm install
 npm run build
 ```
@@ -78,7 +117,7 @@ Set the following environment variables:
 ]
 ```
 
-Each tool in the MCP server now accepts an optional `vaultId` argument. When omitted, the server uses `OBSIDIAN_DEFAULT_VAULT` (or the first defined vault). This allows a single MCP session to read/write multiple vaults just by specifying which vault to target in the tool call.
+Each tool in the MCP server accepts an optional `vaultId` argument. When omitted, the server uses `OBSIDIAN_DEFAULT_VAULT` (or the first defined vault). This allows a single MCP session to read/write multiple vaults just by specifying which vault to target in the tool call.
 
 ### Multi-Vault Port Configuration
 
@@ -145,7 +184,7 @@ Use `npx` for the simplest setup:
   "mcpServers": {
     "obsidian": {
       "command": "npx",
-      "args": ["-y", "@connorbritain/obsidian-mcp-server"],
+      "args": ["-y", "@marwansaab/obsidian-modified-mcp-server"],
       "env": {
         "OBSIDIAN_API_KEY": "your-api-key-here",
         "OBSIDIAN_VAULT_PATH": "/path/to/your/vault",
@@ -166,7 +205,7 @@ If running from source:
   "mcpServers": {
     "obsidian": {
       "command": "node",
-      "args": ["/absolute/path/to/obsidian-mcp-server/dist/index.js"],
+      "args": ["/absolute/path/to/obsidian-modified-mcp-server/dist/index.js"],
       "env": {
         "OBSIDIAN_API_KEY": "your-api-key-here",
         "OBSIDIAN_VAULT_PATH": "/path/to/your/vault",
@@ -212,9 +251,7 @@ All tools accept an optional `vaultId` argument. If omitted, the server uses the
 |------|-------------|
 | `append_content` | Append to file (creates if missing) |
 | `put_content` | Overwrite file content |
-| ~~`patch_content`~~ | ⚠️ **Disabled**: Insert content relative to heading/block (awaiting Obsidian REST API fix - [see issue #146](https://github.com/coddingtonbear/obsidian-local-rest-api/issues/146)) |
-
-> **Note**: The `patch_content` tool is currently disabled due to known bugs in the Obsidian Local REST API plugin. Use the read-modify-write pattern with `get_file_contents` + `put_content` as a reliable alternative.
+| `patch_content` | Insert content relative to a heading, block, or frontmatter target. **Heading targets must use the full `H1::H2[::H3...]` path form** — see [`patch_content` path discipline](#patch_content-path-discipline) above. |
 
 ### Search
 
@@ -258,7 +295,7 @@ All tools accept an optional `vaultId` argument. If omitted, the server uses the
 | Tool | Description |
 |------|-------------|
 | `semantic_search` | Conceptual search via Smart Connections |
-| `find_similar_notes` | Find semantically similar notes
+| `find_similar_notes` | Find semantically similar notes |
 
 ## Development
 
@@ -275,4 +312,4 @@ npm run build
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE). Copyright is held by Connor England (upstream author); this fork's modifications are released under the same MIT terms.

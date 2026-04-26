@@ -1,7 +1,7 @@
 {
-  "name": "@connorbritain/obsidian-mcp-server",
-  "version": "0.2.3",
-  "description": "TypeScript MCP server for Obsidian with core tools, graph analytics, and semantic search",
+  "name": "@marwansaab/obsidian-modified-mcp-server",
+  "version": "0.3.0",
+  "description": "Personal fork of @connorbritain/obsidian-mcp-server. TypeScript MCP server for Obsidian with wrapper-side mitigations of upstream limitations — first concrete change is re-enabling patch_content under a structural-only path validator.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ConnorBritain/obsidian-mcp-server.git"
+    "url": "git+https://github.com/marwansaab/obsidian-modified-mcp-server.git"
   },
   "keywords": [
     "mcp",
@@ -20,14 +20,18 @@
     "llm",
     "knowledge-management",
     "graph-analysis",
-    "semantic-search"
+    "semantic-search",
+    "fork"
   ],
-  "author": "Connor Britain",
+  "author": "Marwan Saab",
+  "contributors": [
+    { "name": "Connor Britain", "url": "https://github.com/ConnorBritain" }
+  ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/ConnorBritain/obsidian-mcp-server/issues"
+    "url": "https://github.com/marwansaab/obsidian-modified-mcp-server/issues"
   },
-  "homepage": "https://github.com/ConnorBritain/obsidian-mcp-server#readme",
+  "homepage": "https://github.com/marwansaab/obsidian-modified-mcp-server#readme",
   "publishConfig": {
     "access": "public"
   },
