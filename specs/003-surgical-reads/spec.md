@@ -5,6 +5,32 @@
 **Status**: Draft
 **Input**: User description: "Add Surgical Reads — Two new MCP tools that fetch part of a vault note instead of the whole file. The first tool, `get_heading_contents`, takes a filepath and a heading target and returns the body content under that heading. It MUST apply the same structural-only path validator established for `patch_content` in ADR-001 (vault-side note: `200-Decisions/ADR-001 - Wrapper Path-Validator Structural-Only.md`): heading targets must be path-shaped with at least two non-empty `::`-separated segments. Headings whose literal text contains `::` and top-level-only headings remain unreachable through this tool, with the same documented fallback to read-modify-write via `get_file_contents`. The validator and its constraints are stated in the MCP tool description so the limitation is visible in the tool schema. The second tool, `get_frontmatter_field`, takes a filepath and a single field name and returns just that frontmatter field's value. Both tools forward the validated request verbatim to the upstream Local REST API plugin's `GET /vault/{path}/heading/{path-segments}` and `GET /vault/{path}/frontmatter/{field}` endpoints. No client-side parsing of the target file is performed."
 
+## Clarifications
+
+### Session 2026-04-26
+
+- Q: What shape should `get_heading_contents` return to the MCP caller? →
+  A: Option A — request `text/markdown` from upstream and return the raw
+  heading-body markdown as a single string. The tool's MCP description
+  must state explicitly: "Returns the raw markdown body content under
+  the targeted heading. Frontmatter, tags, and file metadata are not
+  included — use `get_file_contents` for the whole note or
+  `get_frontmatter_field` for individual frontmatter values." This
+  closes off the metadata question in the tool schema so LLM callers
+  see the boundary at tool-discovery time.
+- Q: How should `get_frontmatter_field` represent the upstream value to
+  the MCP caller? → A: Option B — parse the upstream JSON response and
+  expose the value as a typed value on the MCP output (`{ value: <any
+  JSON> }`), preserving the original frontmatter type (string, number,
+  boolean, array, object, or `null`). This is "verbatim pass-through"
+  in the sense that matters: the upstream already did the YAML→JSON
+  work, and the wrapper neither re-encodes nor stringifies the result.
+  The tool's MCP description must state: "Returns the named frontmatter
+  field's value with its original type preserved — string, number,
+  boolean, array, object, or null. If the field or the note does not
+  exist, the upstream's 4xx error is propagated unchanged. To read all
+  frontmatter fields at once, use `get_file_contents`."
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Read just the body under one heading (Priority: P1)
@@ -104,9 +130,9 @@ as the upstream plugin returns it; no other frontmatter keys appear.
 
 1. **Given** a note whose frontmatter contains a `status` field with value
    `"in-progress"`, **When** the agent requests `get_frontmatter_field` with
-   `field=status`, **Then** the response is the upstream plugin's
-   representation of that field's value, and other frontmatter keys are
-   not included.
+   `field=status`, **Then** the response surfaces that field's value on the
+   MCP output's `value` field with its original frontmatter type preserved
+   (string in this case), and no other frontmatter keys are included.
 2. **Given** a request whose `field` argument is empty or whitespace-only,
    **When** the wrapper validates the input, **Then** the request is
    rejected at the wrapper boundary with a structured error and no
@@ -181,12 +207,16 @@ status code and message.
   upstream plugin's empty-body response is passed to the caller verbatim;
   the wrapper does not synthesize a "not found" error from an empty body.
 - **Frontmatter field is present but holds a structured value** (list,
-  object, boolean, number): the wrapper returns whatever representation
-  the upstream plugin emits. The wrapper does not coerce, stringify, or
-  re-encode the value.
-- **Frontmatter field is present but holds `null`**: the upstream plugin's
-  representation of `null` is passed through unchanged. The wrapper does
-  not collapse `null` into "missing".
+  object, boolean, number): the wrapper decodes the upstream's JSON body
+  and surfaces the typed value on the MCP output's `value` field. A
+  frontmatter `count: 5` reaches the caller as the JSON number `5`, not
+  the string `"5"`; a list reaches the caller as a JSON array. The
+  wrapper does not coerce, stringify, or re-encode the value.
+- **Frontmatter field is present but holds `null`**: the wrapper surfaces
+  `null` as the `value` field on the MCP output. The wrapper does not
+  collapse `null` into "missing"; "missing field" is a separate case
+  signalled by the upstream's 4xx response and surfaced as a structured
+  error per FR-009.
 - **Note path contains characters that need URL-encoding** (spaces,
   `#`, `?`, non-ASCII): the wrapper encodes the path component for the
   outgoing URL but does not otherwise transform the caller's value.
@@ -217,10 +247,14 @@ status code and message.
   least two non-empty segments separated by `::` (i.e., the full
   `H1::H2[::H3...]` path form), (b) top-level headings (no parent) are
   therefore unreachable through this tool, (c) headings whose literal text
-  contains `::` are also unreachable, and (d) the documented fallback for
+  contains `::` are also unreachable, (d) the documented fallback for
   both unreachable-heading cases is `get_file_contents` followed by
-  client-side slicing. This makes all four points visible to the caller at
-  tool-discovery time.
+  client-side slicing, and (e) the tool returns the raw markdown body
+  content under the targeted heading and **does not** include
+  frontmatter, tags, or file metadata — agents needing those should use
+  `get_file_contents` for the whole note or `get_frontmatter_field` for
+  individual frontmatter values. This makes all five points visible to
+  the caller at tool-discovery time.
 - **FR-002**: `get_heading_contents` MUST accept these inputs: note
   filepath (required, non-empty string), heading target (required,
   non-empty string), and an optional vault identifier following the
@@ -238,15 +272,25 @@ status code and message.
   read and write tools.
 - **FR-005**: A heading target that satisfies the rule MUST be forwarded
   to the upstream plugin's `GET /vault/{path}/heading/{path-segments}`
-  endpoint, with the note path URL-encoded as the `{path}` component and
-  each `::`-separated segment URL-encoded as part of the
-  `{path-segments}` component. The wrapper MUST NOT parse the target
-  note's content client-side.
+  endpoint with `Accept: text/markdown`, with the note path URL-encoded
+  as the `{path}` component and each `::`-separated segment URL-encoded
+  as part of the `{path-segments}` component. On a 2xx upstream response,
+  the tool MUST return the upstream response body unchanged (raw
+  markdown text under the targeted heading) as a single string field on
+  the MCP tool output. The wrapper MUST NOT parse, slice, re-wrap, or
+  otherwise transform the body, and MUST NOT request or surface the
+  upstream's JSON envelope (`application/vnd.olrapi.note+json`); agents
+  needing metadata use `get_file_contents`.
 - **FR-006**: The MCP server MUST register a tool named
   `get_frontmatter_field` and return it in `tools/list` responses. Its
-  MCP description MUST state that it returns a single field's value as
-  the upstream plugin emits it (no client-side coercion), and that
-  missing fields surface as structured errors rather than empty values.
+  MCP description MUST state explicitly that (a) it returns the named
+  frontmatter field's value with its original type preserved — string,
+  number, boolean, array, object, or `null`, (b) if the field or the
+  note does not exist, the upstream's 4xx error is propagated
+  unchanged, and (c) the documented fallback for reading all
+  frontmatter fields at once is `get_file_contents`. This makes the
+  typed-value contract and the all-frontmatter fallback visible at
+  tool-discovery time.
 - **FR-007**: `get_frontmatter_field` MUST accept these inputs: note
   filepath (required, non-empty string), field name (required, non-empty
   string after trimming whitespace), and an optional vault identifier
@@ -254,8 +298,14 @@ status code and message.
 - **FR-008**: `get_frontmatter_field` MUST forward valid requests to the
   upstream plugin's `GET /vault/{path}/frontmatter/{field}` endpoint,
   with the note path URL-encoded as the `{path}` component and the field
-  name URL-encoded as the `{field}` component. The wrapper MUST NOT
-  parse the target note's frontmatter client-side.
+  name URL-encoded as the `{field}` component. On a 2xx upstream
+  response, the tool MUST decode the JSON body and surface the decoded
+  value (which may be a string, number, boolean, array, object, or
+  `null`) on the MCP tool output as a single `value` field, preserving
+  the original frontmatter type as represented by the upstream plugin.
+  The wrapper MUST NOT re-encode, stringify, coerce, or otherwise
+  transform the value, and MUST NOT parse the target note's frontmatter
+  client-side from the raw note body.
 - **FR-009**: Both tools MUST surface upstream errors as structured MCP
   errors that preserve the upstream status code (when present) and the
   upstream error message. Neither tool may replace upstream failures with
@@ -291,11 +341,14 @@ status code and message.
   identically in ADR-001 and reused here.
 - **Frontmatter-field request**: A unit of work composed of {note
   filepath, field name, vault identifier?}.
-- **Upstream read response**: Either a 2xx body (the raw heading body
-  for `get_heading_contents`, or the field value for
-  `get_frontmatter_field`) or an error carrying a status code and
-  message. The wrapper does not interpret the body shape; it forwards
-  the upstream payload to the caller.
+- **Upstream read response**: Either a 2xx body or an error carrying a
+  status code and message. For `get_heading_contents` the 2xx body is
+  raw markdown text (returned to the caller unchanged as a single
+  string). For `get_frontmatter_field` the 2xx body is JSON encoding
+  the field's value (decoded by the wrapper and surfaced as a typed
+  `value` on the MCP output). In neither case does the wrapper read or
+  parse the underlying note file; the only "decoding" is the JSON envelope
+  the upstream plugin already emits for the frontmatter endpoint.
 
 ## Success Criteria *(mandatory)*
 
@@ -344,10 +397,14 @@ status code and message.
 - The upstream Local REST API plugin exposes
   `GET /vault/{path}/heading/{path-segments}` and
   `GET /vault/{path}/frontmatter/{field}` with the semantics implied by
-  their URL shapes. The exact request/response details (header
-  conventions, content-type negotiation, body shape for structured
-  frontmatter values) are taken as fixed by the upstream documentation
-  and are a plan-phase concern, not a spec-phase concern.
+  their URL shapes. The heading endpoint honors `Accept: text/markdown`
+  to return the raw body of the targeted heading section; the
+  frontmatter endpoint emits the field's value as a JSON document
+  (string, number, boolean, array, object, or `null`). These two facts
+  are load-bearing for the response-shape decisions recorded in the
+  Clarifications session above. Any other request/response details
+  (auth header conventions, error body shape) are taken as fixed by the
+  upstream documentation and are a plan-phase concern.
 - The wrapper introduces **no escape syntax** for the `::` separator in
   heading targets, and no client-side markdown or YAML parsing for
   either tool. Both choices follow ADR-001's thin-pass-through stance:
