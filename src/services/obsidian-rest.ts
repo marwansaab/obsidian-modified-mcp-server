@@ -140,6 +140,54 @@ export class ObsidianRestService {
   }
 
   /**
+   * Get the body content under a heading path within a note.
+   * The structural validator runs in the wrapper handler before this
+   * method is called, so by the time we get here we are guaranteed
+   * `headingPath` has ≥ 2 non-empty `::`-separated segments.
+   * @param filepath - Path relative to vault root
+   * @param headingPath - H1::H2[::H3...] form, validated upstream by the wrapper
+   */
+  async getHeadingContents(filepath: string, headingPath: string): Promise<string> {
+    return this.safeCall(async () => {
+      const encodedPath = filepath.split('/').map(encodeURIComponent).join('/');
+      const segments = headingPath.split('::').map(encodeURIComponent).join('/');
+      // We send `Accept: text/markdown` so the upstream returns the heading
+      // body as raw markdown. We deliberately leave `responseType` at axios's
+      // default ('json') so that error responses (which the upstream emits as
+      // JSON regardless of the request's Accept header) are decoded into the
+      // typed `{ errorCode, message }` shape that `safeCall` expects. axios's
+      // `transitional.silentJSONParsing` (default `true` in axios 1.x) makes
+      // successful markdown bodies fall back to the raw string when
+      // `JSON.parse` throws, so the happy path still returns plain markdown.
+      const response = await this.client.get<string>(
+        `/vault/${encodedPath}/heading/${segments}`,
+        {
+          headers: { Accept: 'text/markdown' },
+        }
+      );
+      return response.data;
+    });
+  }
+
+  /**
+   * Get a single frontmatter field's value from a note.
+   * Returns the JSON-decoded value (axios's default `responseType: 'json'`
+   * decodes the upstream response automatically), preserving the original
+   * frontmatter type: string, number, boolean, array, object, or null.
+   * @param filepath - Path relative to vault root
+   * @param field - The frontmatter field name
+   */
+  async getFrontmatterField(filepath: string, field: string): Promise<unknown> {
+    return this.safeCall(async () => {
+      const encodedPath = filepath.split('/').map(encodeURIComponent).join('/');
+      const response = await this.client.get<unknown>(
+        `/vault/${encodedPath}/frontmatter/${encodeURIComponent(field)}`
+      );
+      return response.data;
+    });
+  }
+
+  /**
    * Patch content relative to a heading or block
    * @param filepath - Path relative to vault root
    * @param operation - 'append' | 'prepend' | 'replace'

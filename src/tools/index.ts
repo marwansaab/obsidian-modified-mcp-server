@@ -8,6 +8,7 @@ import { OBSIDIAN_TOOLS } from './obsidian-tools.js';
 import { PERIODIC_TOOLS } from './periodic-tools.js';
 import { SEARCH_TOOLS } from './search-tools.js';
 import { SEMANTIC_TOOLS } from './semantic-tools.js';
+import { SURGICAL_READ_TOOLS } from './surgical-reads/tool.js';
 import { VAULT_TOOLS } from './vault-tools.js';
 import { WRITE_TOOLS } from './write-tools.js';
 
@@ -23,6 +24,7 @@ export const ALL_TOOLS: Tool[] = [
   ...OBSIDIAN_TOOLS,
   ...GRAPH_TOOLS,
   ...SEMANTIC_TOOLS,
+  ...SURGICAL_READ_TOOLS,
 ];
 
 export {
@@ -34,4 +36,5 @@ export {
   OBSIDIAN_TOOLS,
   GRAPH_TOOLS,
   SEMANTIC_TOOLS,
+  SURGICAL_READ_TOOLS,
 };
