@@ -296,16 +296,22 @@ No additional logging at the wrapper layer.
 component independently. Specifically:
 
 - `getHeadingContents(filepath, headingPath)`:
-  - Path component: `encodeURIComponent(filepath)` for `{path}`.
-  - Path-segments component: split `headingPath` on `::`, then
-    `encodeURIComponent` each segment, then re-join with `/` — because
-    the upstream URL is `GET /vault/{path}/heading/{seg1}/{seg2}/...`
+  - Path component (filepath): split on `/`, then `encodeURIComponent`
+    each segment, then re-join with `/`. This preserves `/` as the
+    vault-folder separator (matching how the upstream URL grammar
+    parses `{path}` as a multi-segment glob) while properly encoding
+    spaces, `#`, `?`, and non-ASCII characters within each folder or
+    file name.
+  - Path-segments component (headingPath): split `headingPath` on
+    `::`, then `encodeURIComponent` each segment, then re-join with
+    `/` — because the upstream URL is `GET /vault/{path}/heading/{seg1}/{seg2}/...`
     where each segment is its own URL path segment. (This is the
     documented format of the upstream Local REST API plugin's heading
     endpoint.)
 - `getFrontmatterField(filepath, field)`:
-  - Path component: `encodeURIComponent(filepath)` for `{path}`.
-  - Field component: `encodeURIComponent(field)` for `{field}`.
+  - Path component (filepath): same per-segment encoding as above.
+  - Field component: `encodeURIComponent(field)` for `{field}` (the
+    field name is a single URL path segment).
 
 **Rationale**:
 
@@ -332,6 +338,19 @@ component independently. Specifically:
 - **Use `encodeURI` instead of `encodeURIComponent`**: too permissive
   — does not encode `?`, `#`, `/`, which would break the URL when a
   segment contains them.
+- **Match the existing convention exactly** (interpolate `filepath`
+  into the URL with no encoding, as `getFileContents` and `patchContent`
+  do): would silently break for vault files whose path contains spaces,
+  `?`, or `#`. The existing tools have this as a latent bug. Diverging
+  here is a narrow, additive improvement that does not touch existing
+  tools (per Constitution scope-honesty), and the per-segment split
+  preserves the same `/`-as-separator semantics every caller already
+  relies on.
+- **`encodeURIComponent(filepath)` directly on the whole string**:
+  rejected because it encodes `/` to `%2F`, and the upstream URL router
+  treats `%2F` as a literal character in a single path segment rather
+  than as a path-segment boundary, breaking lookups for any file in a
+  subfolder.
 
 **Confidence**: high. Tested via the URL-encoding cases in the
 contract test matrix (heading segment containing `/`, filepath

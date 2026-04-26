@@ -180,6 +180,7 @@ Each row maps to one test in
 | H1 | Valid 2-segment heading path, upstream returns 2xx with body `"- item one\n- item two\n"` | Successful response per §3 with `text` equal to that body verbatim |
 | H1b | Valid 2-segment path, upstream returns 2xx with empty body | Successful response per §3 with `text` equal to `""` (no synthesized error) |
 | H1c | Valid 2-segment path with special characters in a segment (e.g., `Project::Q3 / Plan`), upstream returns 2xx | Verifies URL-encoding: nock asserts the URL path is `/vault/note.md/heading/Project/Q3%20%2F%20Plan` — segment split on `::`, then each segment `encodeURIComponent`-ed, then re-joined with `/`. Verifies R8. |
+| H1d | Valid 2-segment heading path with special characters in the **filepath** (`filepath="Folder With Spaces/note name.md"`, `heading="A::B"`), upstream returns 2xx | Verifies filepath URL-encoding: nock asserts the URL path is `/vault/Folder%20With%20Spaces/note%20name.md/heading/A/B` — the `/` between folder and filename is preserved as a literal path-segment separator, while spaces in each component are percent-encoded. Verifies the per-component encoding from R8 on the filepath side (H1c verifies it on the heading-segment side). |
 | H2 | `heading="Action Items"` (bare) | Validation error per §4 with the three required substrings; **no HTTP call made** (verified at schema level via `assertValidHeadingPathTarget`) |
 | H2b | H2 driven through the handler with `nock.disableNetConnect()` | Validation error per §4; the handler must call the validator before `rest.getHeadingContents` so no `NetConnectNotAllowedError` is observed (verifies SC-001 at the integration boundary) |
 | H3 | `heading="A::B::"` (trailing empty) | Validation error per §4; no HTTP call |
@@ -192,7 +193,7 @@ Each row maps to one test in
 | H10 | Valid input, upstream unreachable (`ECONNREFUSED` via `nock.disableNetConnect()`) | Upstream-failure response per §5 with code `-1` |
 | HR | `tools/list` is called | Response contains an entry with `name: "get_heading_contents"` and a `description` whose case-insensitive content contains all five testable phrases listed in §1: `h1::h2`, `top-level`, `literal text contains`, `get_file_contents`, `frontmatter, tags` |
 
-H1, H1b, H1c assert the upstream HTTP **path and Accept header** via
+H1, H1b, H1c, H1d assert the upstream HTTP **path and Accept header** via
 nock's path-matching and `.matchHeader` helpers. Without these
 assertions, the tests could silently pass even if `rest.getHeadingContents`
 stopped sending `Accept: text/markdown` or constructed the URL

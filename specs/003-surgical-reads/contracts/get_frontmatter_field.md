@@ -199,6 +199,7 @@ Each row maps to one test in
 | F7 | `field=""` (empty) | Validation error per §4 caught by zod `.min(1)`; message names `field`; no HTTP call |
 | F8 | `field="   "` (whitespace-only) | Validation error per §4 caught by zod `.refine()`; message names `field` and includes refinement text; no HTTP call |
 | F9 | Special characters in `field` (e.g., `field="my:custom"`) and a normal value | Verifies URL-encoding: nock asserts the URL path is `/vault/note.md/frontmatter/my%3Acustom`. Verifies R8. |
+| F9b | Special characters in **filepath** (`filepath="Folder With Spaces/note name.md"`, `field="status"`) | Verifies filepath URL-encoding: nock asserts the URL path is `/vault/Folder%20With%20Spaces/note%20name.md/frontmatter/status` — same per-component encoding contract as H1d (the `/` between folder and filename is preserved, while spaces are percent-encoded to `%20`). |
 | F10 | Valid input, upstream returns 404 with `{errorCode: 40400, message: "Frontmatter field not found"}` | Upstream-failure response per §5; preserves `40400` and message. Distinct from F6. |
 | F11 | Valid input, upstream returns 401 with `{errorCode: 40100, message: "Invalid API key"}` | Upstream-failure response per §5; preserves status code and message |
 | F12 | Valid input, upstream unreachable (`ECONNREFUSED` via `nock.disableNetConnect()`) | Upstream-failure response per §5 with code `-1` |

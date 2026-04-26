@@ -26,9 +26,10 @@ following the patterns already established in that file.
  */
 async getHeadingContents(filepath: string, headingPath: string): Promise<string> {
   return this.safeCall(async () => {
+    const encodedPath = filepath.split('/').map(encodeURIComponent).join('/');
     const segments = headingPath.split('::').map(encodeURIComponent).join('/');
     const response = await this.client.get<string>(
-      `/vault/${encodeURIComponent(filepath)}/heading/${segments}`,
+      `/vault/${encodedPath}/heading/${segments}`,
       {
         headers: { Accept: 'text/markdown' },
         responseType: 'text',
@@ -46,8 +47,9 @@ async getHeadingContents(filepath: string, headingPath: string): Promise<string>
  */
 async getFrontmatterField(filepath: string, field: string): Promise<unknown> {
   return this.safeCall(async () => {
+    const encodedPath = filepath.split('/').map(encodeURIComponent).join('/');
     const response = await this.client.get<unknown>(
-      `/vault/${encodeURIComponent(filepath)}/frontmatter/${encodeURIComponent(field)}`
+      `/vault/${encodedPath}/frontmatter/${encodeURIComponent(field)}`
     );
     return response.data;
   });
