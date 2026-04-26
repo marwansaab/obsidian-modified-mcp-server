@@ -17,6 +17,15 @@ import { getConfig } from './config.js';
 import { GraphService } from './services/graph-service.js';
 import { ObsidianRestService } from './services/obsidian-rest.js';
 import { SmartConnectionsService } from './services/smart-connections.js';
+import {
+  handleDetectNoteClusters,
+  handleFindOrphanNotes,
+  handleFindPathBetweenNotes,
+  handleGetMostConnectedNotes,
+  handleGetNoteConnections,
+  handleGetVaultStats,
+  handleGetVaultStructure,
+} from './tools/graph/handlers.js';
 import { ALL_TOOLS } from './tools/index.js';
 import { handlePatchContent } from './tools/patch-content/handler.js';
 import { handleGetFrontmatterField } from './tools/surgical-reads/handler-frontmatter.js';
@@ -45,7 +54,7 @@ type PatternSearchResult = {
   context: string;
 };
 
-class ObsidianMCPServer {
+export class ObsidianMCPServer {
   private server: Server;
   private config: Config;
   private restServices = new Map<string, ObsidianRestService>();
@@ -261,7 +270,7 @@ class ObsidianMCPServer {
     });
   }
 
-  private async handleToolCall(
+  public async handleToolCall(
     name: string,
     args: Record<string, unknown>
   ): Promise<CallToolResult> {
@@ -471,6 +480,27 @@ class ObsidianMCPServer {
           content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
         };
       }
+
+      case 'get_vault_stats':
+        return handleGetVaultStats(args, this.getGraphService(vaultId));
+
+      case 'get_vault_structure':
+        return handleGetVaultStructure(args, this.getGraphService(vaultId));
+
+      case 'find_orphan_notes':
+        return handleFindOrphanNotes(args, this.getGraphService(vaultId));
+
+      case 'get_note_connections':
+        return handleGetNoteConnections(args, this.getGraphService(vaultId));
+
+      case 'find_path_between_notes':
+        return handleFindPathBetweenNotes(args, this.getGraphService(vaultId));
+
+      case 'get_most_connected_notes':
+        return handleGetMostConnectedNotes(args, this.getGraphService(vaultId));
+
+      case 'detect_note_clusters':
+        return handleDetectNoteClusters(args, this.getGraphService(vaultId));
 
       default: {
         throw new Error(`Unknown tool: ${name}`);

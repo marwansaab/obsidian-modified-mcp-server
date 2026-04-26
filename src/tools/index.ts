@@ -3,7 +3,7 @@
  */
 
 import { FILE_TOOLS } from './file-tools.js';
-import { GRAPH_TOOLS } from './graph-tools.js';
+import { GRAPH_TOOLS } from './graph/tool.js';
 import { OBSIDIAN_TOOLS } from './obsidian-tools.js';
 import { PERIODIC_TOOLS } from './periodic-tools.js';
 import { SEARCH_TOOLS } from './search-tools.js';
