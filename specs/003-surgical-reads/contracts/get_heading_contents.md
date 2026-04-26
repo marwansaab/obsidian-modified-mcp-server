@@ -199,6 +199,7 @@ assertions, the tests could silently pass even if `rest.getHeadingContents`
 stopped sending `Accept: text/markdown` or constructed the URL
 incorrectly — undermining FR-005.
 
-H2 through H7 satisfy FR-003 + FR-004 plus the URL-encoding case
-identified in spec FR-011(a). H8/H9/H10 verify FR-009 (Constitution IV).
+H1c and H1d satisfy the URL-encoding case in spec FR-011(a) — H1c on
+the heading-segment side, H1d on the filepath side. H2 through H7
+satisfy FR-003 + FR-004. H8/H9/H10 verify FR-009 (Constitution IV).
 HR verifies FR-001 at the integration boundary.
