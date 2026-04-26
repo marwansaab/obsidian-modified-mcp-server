@@ -62,6 +62,12 @@ export interface NoteConnections {
   tags: string[];
 }
 
+/** Envelope wrapping aggregation-tool results with skip metadata (FR-011) */
+export type AggregationEnvelope<T> = T & {
+  skipped: number;
+  skippedPaths: string[];
+};
+
 /** Semantic search result */
 export interface SemanticResult {
   path: string;

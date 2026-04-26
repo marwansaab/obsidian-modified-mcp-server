@@ -40,6 +40,8 @@ export class GraphService {
   private lastBuildTime = 0;
   private cacheTTL: number;
   private noteTags: Map<string, string[]> = new Map();
+  private lastSkipped = 0;
+  private lastSkippedPaths: string[] = [];
 
   constructor(vault: VaultConfig, cacheTtlSeconds: number) {
     this.vaultId = vault.id;
@@ -67,6 +69,8 @@ export class GraphService {
     // Clear existing graph
     this.graph.clear();
     this.noteTags.clear();
+    this.lastSkipped = 0;
+    this.lastSkippedPaths = [];
 
     // Find all markdown files
     const mdFiles = await this.findMarkdownFiles(this.vaultPath);
@@ -78,42 +82,62 @@ export class GraphService {
       this.graph.addNode(relativePath, { name, path: relativePath });
     }
 
-    // Parse each file for links
+    // Parse each file for links — skip-and-continue on read/parse failure (FR-011)
     for (const filePath of mdFiles) {
       const relativePath = relative(this.vaultPath, filePath);
-      const content = await fs.readFile(filePath, 'utf-8');
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
 
-      // Extract wikilinks
-      const wikilinks = this.extractWikilinks(content);
-      for (const target of wikilinks) {
-        const targetPath = this.resolveLink(target, mdFiles);
-        if (targetPath && this.graph.hasNode(targetPath) && relativePath !== targetPath) {
-          if (!this.graph.hasEdge(relativePath, targetPath)) {
-            this.graph.addEdge(relativePath, targetPath, { type: 'link' });
+        // Extract wikilinks
+        const wikilinks = this.extractWikilinks(content);
+        for (const target of wikilinks) {
+          const targetPath = this.resolveLink(target, mdFiles);
+          if (targetPath && this.graph.hasNode(targetPath) && relativePath !== targetPath) {
+            if (!this.graph.hasEdge(relativePath, targetPath)) {
+              this.graph.addEdge(relativePath, targetPath, { type: 'link' });
+            }
           }
         }
-      }
 
-      // Extract markdown links
-      const mdLinks = this.extractMarkdownLinks(content);
-      for (const target of mdLinks) {
-        const targetPath = this.resolveLink(target, mdFiles);
-        if (targetPath && this.graph.hasNode(targetPath) && relativePath !== targetPath) {
-          if (!this.graph.hasEdge(relativePath, targetPath)) {
-            this.graph.addEdge(relativePath, targetPath, { type: 'link' });
+        // Extract markdown links
+        const mdLinks = this.extractMarkdownLinks(content);
+        for (const target of mdLinks) {
+          const targetPath = this.resolveLink(target, mdFiles);
+          if (targetPath && this.graph.hasNode(targetPath) && relativePath !== targetPath) {
+            if (!this.graph.hasEdge(relativePath, targetPath)) {
+              this.graph.addEdge(relativePath, targetPath, { type: 'link' });
+            }
           }
         }
-      }
 
-      // Extract tags
-      const tags = this.extractTags(content);
-      if (tags.length > 0) {
-        this.noteTags.set(relativePath, tags);
+        // Extract tags
+        const tags = this.extractTags(content);
+        if (tags.length > 0) {
+          this.noteTags.set(relativePath, tags);
+        }
+      } catch {
+        this.lastSkipped++;
+        this.lastSkippedPaths.push(relativePath);
       }
     }
 
     this.initialized = true;
     this.lastBuildTime = Date.now();
+  }
+
+  /**
+   * Number of files skipped during the most recent build (FR-011).
+   */
+  getLastSkipped(): number {
+    return this.lastSkipped;
+  }
+
+  /**
+   * Relative paths of files skipped during the most recent build (FR-011).
+   * Full list — handler is responsible for the 50-entry truncation cap.
+   */
+  getLastSkippedPaths(): string[] {
+    return this.lastSkippedPaths;
   }
 
   /**
@@ -283,7 +307,7 @@ export class GraphService {
     const nodePath = filepath.endsWith('.md') ? filepath : `${filepath}.md`;
 
     if (!this.graph.hasNode(nodePath)) {
-      throw new Error(`Note not found in graph: ${filepath}`);
+      throw new Error(`note not found: ${filepath}`);
     }
 
     const outgoingLinks: string[] = [];
@@ -316,11 +340,16 @@ export class GraphService {
     const sourcePath = source.endsWith('.md') ? source : `${source}.md`;
     const targetPath = target.endsWith('.md') ? target : `${target}.md`;
 
-    if (!this.graph.hasNode(sourcePath)) {
-      throw new Error(`Source note not found: ${source}`);
+    const sourceMissing = !this.graph.hasNode(sourcePath);
+    const targetMissing = !this.graph.hasNode(targetPath);
+    if (sourceMissing && targetMissing) {
+      throw new Error(`notes not found: ${source}, ${target}`);
     }
-    if (!this.graph.hasNode(targetPath)) {
-      throw new Error(`Target note not found: ${target}`);
+    if (sourceMissing) {
+      throw new Error(`note not found: ${source}`);
+    }
+    if (targetMissing) {
+      throw new Error(`note not found: ${target}`);
     }
 
     // Use bidirectional search for efficiency

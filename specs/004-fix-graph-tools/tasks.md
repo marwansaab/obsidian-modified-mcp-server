@@ -29,9 +29,9 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 **Purpose**: Create the new directories and confirm the toolchain is ready. The branch (`004-fix-graph-tools`) already exists.
 
-- [ ] T001 Create directory `src/tools/graph/` (will hold `schemas.ts`, `handlers.ts`, `tool.ts`)
-- [ ] T002 [P] Create directory `tests/tools/graph/` (will hold `registration.test.ts`, `schema.test.ts`, `handler-vault-stats.test.ts`, `handler-per-note.test.ts`, `smoke.test.ts`)
-- [ ] T003 [P] Confirm `npm run lint`, `npm run typecheck`, `npm run test` all pass on the current `main` baseline as a sanity check before changes (no work to do if green; investigate if not)
+- [X] T001 Create directory `src/tools/graph/` (will hold `schemas.ts`, `handlers.ts`, `tool.ts`)
+- [X] T002 [P] Create directory `tests/tools/graph/` (will hold `registration.test.ts`, `schema.test.ts`, `handler-vault-stats.test.ts`, `handler-per-note.test.ts`, `smoke.test.ts`)
+- [X] T003 [P] Confirm `npm run lint`, `npm run typecheck`, `npm run test` all pass on the current `main` baseline as a sanity check before changes (no work to do if green; investigate if not)
 
 **Checkpoint**: Directories exist; baseline is green.
 
@@ -43,10 +43,10 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T004 Edit `src/types.ts` — add an exported `AggregationEnvelope<T>` type alias (shape: `T & { skipped: number; skippedPaths: string[] }`) for use by handlers. Existing types (`VaultStats`, `NoteConnections`) remain unchanged.
-- [ ] T005 Edit `src/services/graph-service.ts` — add private instance fields `lastSkipped: number` (init 0) and `lastSkippedPaths: string[]` (init []). Reset both at the start of `buildGraph()`. Wrap the per-file `fs.readFile` + parse loop (lines 82-113) in `try/catch`; on any error, increment `lastSkipped` and push the relative path onto `lastSkippedPaths`. Add public getters `getLastSkipped()` and `getLastSkippedPaths()` returning the current values.
-- [ ] T006 Edit `src/services/graph-service.ts` — align `getNoteConnections` not-found message (line 286) from `Note not found in graph: ${filepath}` to `note not found: ${filepath}`. Align `findPathBetweenNotes` source-missing (line 320) and target-missing (line 323) messages to `note not found: ${source}` and `note not found: ${target}` respectively. When BOTH endpoints are missing, throw a single `note not found: ${source}, ${target}` error after checking both — restructure the two checks into one combined check that reports both missing endpoints together. (Vault-id suffix is added by the handler, NOT by the service — see R5.)
-- [ ] T007 Create `src/tools/graph/schemas.ts` — define seven zod schemas (`GetVaultStatsRequestSchema`, `GetVaultStructureRequestSchema`, `FindOrphanNotesRequestSchema`, `GetNoteConnectionsRequestSchema`, `FindPathBetweenNotesRequestSchema`, `GetMostConnectedNotesRequestSchema`, `DetectNoteClustersRequestSchema`) per [data-model.md](data-model.md) shapes. Export inferred types and `assertValid*Request(args)` functions for each — pattern: `return Schema.parse(args)`. No structural validators (no `assertValidPatchRequest`-style extra logic) needed for graph tools.
+- [X] T004 Edit `src/types.ts` — add an exported `AggregationEnvelope<T>` type alias (shape: `T & { skipped: number; skippedPaths: string[] }`) for use by handlers. Existing types (`VaultStats`, `NoteConnections`) remain unchanged.
+- [X] T005 Edit `src/services/graph-service.ts` — add private instance fields `lastSkipped: number` (init 0) and `lastSkippedPaths: string[]` (init []). Reset both at the start of `buildGraph()`. Wrap the per-file `fs.readFile` + parse loop (lines 82-113) in `try/catch`; on any error, increment `lastSkipped` and push the relative path onto `lastSkippedPaths`. Add public getters `getLastSkipped()` and `getLastSkippedPaths()` returning the current values.
+- [X] T006 Edit `src/services/graph-service.ts` — align `getNoteConnections` not-found message (line 286) from `Note not found in graph: ${filepath}` to `note not found: ${filepath}`. Align `findPathBetweenNotes` source-missing (line 320) and target-missing (line 323) messages to `note not found: ${source}` and `note not found: ${target}` respectively. When BOTH endpoints are missing, throw a single `notes not found: ${source}, ${target}` error after checking both — restructure the two checks into one combined check that reports both missing endpoints together. (Vault-id suffix is added by the handler, NOT by the service — see R5. Note: contract specifies plural "notes" for both-missing case.)
+- [X] T007 Create `src/tools/graph/schemas.ts` — define seven zod schemas (`GetVaultStatsRequestSchema`, `GetVaultStructureRequestSchema`, `FindOrphanNotesRequestSchema`, `GetNoteConnectionsRequestSchema`, `FindPathBetweenNotesRequestSchema`, `GetMostConnectedNotesRequestSchema`, `DetectNoteClustersRequestSchema`) per [data-model.md](data-model.md) shapes. Export inferred types and `assertValid*Request(args)` functions for each — pattern: `return Schema.parse(args)`. No structural validators (no `assertValidPatchRequest`-style extra logic) needed for graph tools.
 
 **Checkpoint**: `npm run typecheck` passes. Service tracks skipped data and uses the FR-012 error format. Zod schemas are ready for handlers and `tool.ts` to consume.
 
@@ -60,17 +60,17 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Create `src/tools/graph/handlers.ts` — define seven async handler functions (`handleGetVaultStats`, `handleGetVaultStructure`, `handleFindOrphanNotes`, `handleGetNoteConnections`, `handleFindPathBetweenNotes`, `handleGetMostConnectedNotes`, `handleDetectNoteClusters`). Each:
+- [X] T008 [US1] Create `src/tools/graph/handlers.ts` — define seven async handler functions (`handleGetVaultStats`, `handleGetVaultStructure`, `handleFindOrphanNotes`, `handleGetNoteConnections`, `handleFindPathBetweenNotes`, `handleGetMostConnectedNotes`, `handleDetectNoteClusters`). Each:
   1. Validates `args` via the corresponding `assertValid*Request` from `./schemas.js`.
   2. Calls the appropriate `service.method(...)` (where `service: GraphService` is passed in by the dispatcher).
   3. **For aggregation tools**: wraps the result in `AggregationEnvelope<T>` reading `service.getLastSkipped()` and `service.getLastSkippedPaths().slice(0, 50)`.
   4. **For per-note tools** (`handleGetNoteConnections`, `handleFindPathBetweenNotes`): catches `Error` thrown by the service, and IF the message starts with `note not found:` AND the validated args include an explicit `vaultId`, re-throws with ` (vault: <id>)` appended; otherwise lets the error propagate unchanged.
   5. Returns `{ content: [{ type: 'text', text: JSON.stringify(envelope, null, 2) }] }`.
-- [ ] T009 [P] [US1] Create `src/tools/graph/tool.ts` — import the seven zod schemas from `./schemas.js`, derive `inputSchema` for each via `zodToJsonSchema(Schema, { $refStrategy: 'none' })`, and export `GRAPH_TOOLS: Tool[]` containing the seven entries. Follow the pattern in [src/tools/patch-content/tool.ts](../../src/tools/patch-content/tool.ts).
-- [ ] T010 [US1] Update each tool's `description` field in `src/tools/graph/tool.ts` to state the precondition explicitly (FR-008). Required text: `"Requires OBSIDIAN_VAULT_PATH to be set for the targeted vault."` MUST appear in each of the seven descriptions. For per-note tools (FR-012), the description MUST additionally state: `"Returns a precondition-style error 'note not found: <path>' when the target note is not present in the vault — distinct from 'found but no connections'/'no path between endpoints'."`
-- [ ] T011 [US1] Update `src/tools/index.ts` — replace the import `import { GRAPH_TOOLS } from './graph-tools.js';` with `import { GRAPH_TOOLS } from './graph/tool.js';`. The `ALL_TOOLS` spread stays unchanged.
-- [ ] T012 [US1] Delete `src/tools/graph-tools.ts` (the legacy hand-written JSON schema file). Confirm `npm run typecheck` and `npm run lint` still pass.
-- [ ] T013 [US1] Edit `src/index.ts` — three changes in this single edit:
+- [X] T009 [P] [US1] Create `src/tools/graph/tool.ts` — import the seven zod schemas from `./schemas.js`, derive `inputSchema` for each via `zodToJsonSchema(Schema, { $refStrategy: 'none' })`, and export `GRAPH_TOOLS: Tool[]` containing the seven entries. Follow the pattern in [src/tools/patch-content/tool.ts](../../src/tools/patch-content/tool.ts).
+- [X] T010 [US1] Update each tool's `description` field in `src/tools/graph/tool.ts` to state the precondition explicitly (FR-008). Required text: `"Requires OBSIDIAN_VAULT_PATH to be set for the targeted vault."` MUST appear in each of the seven descriptions. For per-note tools (FR-012), the description MUST additionally state: `"Returns a precondition-style error 'note not found: <path>' when the target note is not present in the vault — distinct from 'found but no connections'/'no path between endpoints'."`
+- [X] T011 [US1] Update `src/tools/index.ts` — replace the import `import { GRAPH_TOOLS } from './graph-tools.js';` with `import { GRAPH_TOOLS } from './graph/tool.js';`. The `ALL_TOOLS` spread stays unchanged.
+- [X] T012 [US1] Delete `src/tools/graph-tools.ts` (the legacy hand-written JSON schema file). Confirm `npm run typecheck` and `npm run lint` still pass.
+- [X] T013 [US1] Edit `src/index.ts` — three changes in this single edit:
   1. **Export the class**: change `class ObsidianMCPServer` (line 48) to `export class ObsidianMCPServer` so the smoke test (T019) can `import { ObsidianMCPServer }` and instantiate it.
   2. **Make the dispatcher accessible**: change `private async handleToolCall(` (line 264) to `public async handleToolCall(` so the smoke test can invoke it directly. (Constitution Principle I's modularity rule isn't violated by exposing a single method that already serves as the public entry point for tool dispatch.)
   3. **Wire the seven graph dispatcher branches**: add seven new `case` branches to the `switch (name)` in `handleToolCall` (between `case 'pattern_search':` at line 462 and `default:` at line 475). Each case:
@@ -106,8 +106,8 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 > **NOTE**: These tests are required by spec FRs (FR-006, FR-013) and Constitution Principle II. They are NOT optional.
 
-- [ ] T014 [P] [US2] Create `tests/tools/graph/registration.test.ts` — for each of the seven tool names: assert it appears in `ALL_TOOLS`, has a derived `inputSchema` of `type: 'object'`, and its `description` contains the literal substring `OBSIDIAN_VAULT_PATH` (FR-008 verification). For the two per-note tools, additionally assert the description contains BOTH (a) the literal substring `note not found:` AND (b) the disambiguation phrase `distinct from 'found but no connections'` — together these guard the full FR-012 contract per analyze remediation I3. Pattern after [tests/tools/patch-content/registration.test.ts](../../tests/tools/patch-content/registration.test.ts).
-- [ ] T015 [P] [US2] Create `tests/tools/graph/schema.test.ts` — for each of the seven `assertValid*Request` validators, assert one happy-path call returns the typed object AND one failure case throws (e.g. `assertValidGetNoteConnectionsRequest({})` throws `ZodError` whose message references `filepath`). All seven failure cases MUST be present (one per tool; constitution Principle II requires the validation-failure half for *every* registered tool):
+- [X] T014 [P] [US2] Create `tests/tools/graph/registration.test.ts` — for each of the seven tool names: assert it appears in `ALL_TOOLS`, has a derived `inputSchema` of `type: 'object'`, and its `description` contains the literal substring `OBSIDIAN_VAULT_PATH` (FR-008 verification). For the two per-note tools, additionally assert the description contains BOTH (a) the literal substring `note not found:` AND (b) the disambiguation phrase `distinct from 'found but no connections'` — together these guard the full FR-012 contract per analyze remediation I3. Pattern after [tests/tools/patch-content/registration.test.ts](../../tests/tools/patch-content/registration.test.ts).
+- [X] T015 [P] [US2] Create `tests/tools/graph/schema.test.ts` — for each of the seven `assertValid*Request` validators, assert one happy-path call returns the typed object AND one failure case throws (e.g. `assertValidGetNoteConnectionsRequest({})` throws `ZodError` whose message references `filepath`). All seven failure cases MUST be present (one per tool; constitution Principle II requires the validation-failure half for *every* registered tool):
   - `get_vault_stats` with `vaultId: 42` (type failure on optional `vaultId: string`)
   - `get_vault_structure` with `maxDepth: -1` (negative integer rejected by `.nonnegative()`)
   - `find_orphan_notes` with `includeBacklinks: 'yes'` (type failure on optional `includeBacklinks: boolean`)
@@ -117,18 +117,18 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
   - `get_most_connected_notes` with `metric: 'centrality'` (invalid enum value)
   - `detect_note_clusters` with `minClusterSize: 0` (rejected by `.positive()`)
   Note: that's eight failure assertions across seven tools (`find_path_between_notes` gets two — one per required field). The "happy-path" half here tests the validator's typed-return contract, NOT the tool's end-to-end happy path; tool-level happy paths are covered by T016 + T017.
-- [ ] T016 [P] [US2] Create `tests/tools/graph/handler-vault-stats.test.ts` — FR-006 deep test:
+- [X] T016 [P] [US2] Create `tests/tools/graph/handler-vault-stats.test.ts` — FR-006 deep test:
   1. Create a stub `GraphService` (or use `vi.spyOn`) whose `getVaultStats()` returns a fixed `{ totalNotes: 42, totalLinks: 100, orphanCount: 3, tagCount: 17, clusterCount: 5 }` and whose `getLastSkipped()` returns `2`, `getLastSkippedPaths()` returns `['bad1.md', 'bad2.md']`.
   2. Call `await handleGetVaultStats({}, stubService)`.
   3. Assert: `stubService.getVaultStats` was called exactly once with no arguments.
   4. Assert: `result.content[0].text` (parsed as JSON) equals `{ totalNotes: 42, totalLinks: 100, orphanCount: 3, tagCount: 17, clusterCount: 5, skipped: 2, skippedPaths: ['bad1.md', 'bad2.md'] }`.
   5. Add a second test case asserting truncation: when `getLastSkippedPaths()` returns 60 entries, the envelope's `skippedPaths` has exactly 50 entries while `skipped` reports 60.
-- [ ] T017 [P] [US2] Create `tests/tools/graph/handler-per-note.test.ts` — happy-path coverage for the two per-note tools (constitution Principle II requires every registered tool to have a happy-path test; the FR-013 smoke deliberately fires error paths for these two and so does NOT satisfy Principle II for them).
+- [X] T017 [P] [US2] Create `tests/tools/graph/handler-per-note.test.ts` — happy-path coverage for the two per-note tools (constitution Principle II requires every registered tool to have a happy-path test; the FR-013 smoke deliberately fires error paths for these two and so does NOT satisfy Principle II for them).
   1. **`handleGetNoteConnections` happy path**: stub `GraphService.getNoteConnections('Daily/2026-04-26.md')` to return `{ filepath: 'Daily/2026-04-26.md', outgoingLinks: ['Projects/Inbox.md'], backlinks: ['Index.md'], tags: ['daily'] }`. Call the handler with `{ filepath: 'Daily/2026-04-26.md' }`. Assert: service called once with the supplied filepath; `result.content[0].text` (parsed as JSON) equals the stubbed return value (no envelope per FR-011 carve-out).
   2. **`handleGetNoteConnections` `vaultId` propagation**: stub the service's not-found throw to surface `note not found: missing.md`. Call the handler with `{ filepath: 'missing.md', vaultId: 'work' }`. Assert: the error message ends with `(vault: work)` (handler-side suffix per R5 / FR-012).
   3. **`handleFindPathBetweenNotes` happy path**: stub `GraphService.findPathBetweenNotes('a.md', 'c.md')` to return `['a.md', 'b.md', 'c.md']`. Call the handler with `{ source: 'a.md', target: 'c.md' }`. Assert: `result.content[0].text` parses to `{ path: ['a.md', 'b.md', 'c.md'] }`.
   4. **`handleFindPathBetweenNotes` no-path-found**: stub the service to return `null` (both endpoints exist, no walk connects them). Call the handler. Assert: `result.content[0].text` parses to `{ path: null }` (the FR-012 distinction between "not found" error and "no path" success).
-- [ ] T018 [P] [US2] Create `tests/tools/graph/smoke.test.ts` — FR-013 parametrized smoke test PLUS payload-shape assertions for the four aggregation rows (constitution Principle II — happy-path code must be asserted, not just exercised):
+- [X] T018 [P] [US2] Create `tests/tools/graph/smoke.test.ts` — FR-013 parametrized smoke test PLUS payload-shape assertions for the four aggregation rows (constitution Principle II — happy-path code must be asserted, not just exercised):
   1. **Test setup** (per analyze remediations I1 + M1): vitest's `vi.mock(...)` factory is **hoisted** to the top of the module — above all imports and lifecycle hooks — so the tmp-dir variable it references must be created during the same hoisted phase. Use `vi.hoisted(...)` to share the tmp dir between mock factory and the rest of the file:
 
       ```ts
@@ -189,13 +189,13 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 ### Implementation for User Story 3
 
-- [ ] T019 [US3] Edit `README.md` — locate the "Available tools" section (or equivalent — verify exact heading wording). For each of the seven graph tools, add an entry that:
+- [X] T019 [US3] Edit `README.md` — locate the "Available tools" section (or equivalent — verify exact heading wording). For each of the seven graph tools, add an entry that:
   1. States the tool name.
   2. Gives a one-line description matching the schema description.
   3. States the precondition: `Requires OBSIDIAN_VAULT_PATH to be set for the targeted vault.`
   4. For per-note tools, mentions the not-found contract: returns `note not found: <path>` for missing targets.
   5. References the contract file under `specs/004-fix-graph-tools/contracts/` for the full I/O shape.
-- [ ] T020 [US3] If the README has a top-level features list or feature-flag table that previously omitted graph tools (or marked them as broken), update those locations to reflect that graph tools work and require `OBSIDIAN_VAULT_PATH`. (This task is conditional — verify the README structure first; if no such section exists, this task is a no-op and can be marked complete.)
+- [X] T020 [US3] If the README has a top-level features list or feature-flag table that previously omitted graph tools (or marked them as broken), update those locations to reflect that graph tools work and require `OBSIDIAN_VAULT_PATH`. (No-op: features list already includes "Graph Tools"; "Differences from upstream" table never mentioned graph tools as broken.)
 
 **Checkpoint**: All three user stories are independently functional and documented.
 
@@ -205,13 +205,13 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 **Purpose**: Pre-merge quality gates. The constitution requires lint + typecheck + build + test all to pass before merge.
 
-- [ ] T021 Run `npm run lint` — fix any new warnings introduced by Phases 2-5. Zero warnings required (constitution Section 2).
-- [ ] T022 Run `npm run typecheck` — zero errors required (constitution Section 2). Pay particular attention to the new `AggregationEnvelope<T>` generic and the handler return types.
-- [ ] T023 Run `npm run build` — confirm `tsup` produces a clean bundle with the new graph module included.
-- [ ] T024 Run `npm run test` — full suite passes (existing patch-content + surgical-reads tests still green; new graph tests all pass).
-- [ ] T025 [P] Reverse-validate per [quickstart.md "Reverse-validation"](quickstart.md#reverse-validation-optional-but-recommended): comment out one of the seven dispatcher cases, re-run tests, confirm the corresponding test fails with a named error, then restore.
-- [ ] T026 [P] Manual verification per [quickstart.md "Manual verification"](quickstart.md#manual-verification-against-a-real-mcp-client) steps 1-5 against a real Obsidian vault: `list_vaults` shows `hasVaultPath: true`; all seven tools called and return non-error responses; `skipped`/`skippedPaths` contract works when a deliberately-corrupt file is added; precondition error fires when `OBSIDIAN_VAULT_PATH` is unset; `note not found:` error fires for missing per-note targets.
-- [ ] T027 PR description includes the constitution one-liner: `Principles I–IV considered.` per Constitution Section 4 / Compliance review.
+- [X] T021 Run `npm run lint` — fix any new warnings introduced by Phases 2-5. Zero warnings required (constitution Section 2).
+- [X] T022 Run `npm run typecheck` — zero errors required (constitution Section 2). Pay particular attention to the new `AggregationEnvelope<T>` generic and the handler return types.
+- [X] T023 Run `npm run build` — confirm `tsup` produces a clean bundle with the new graph module included.
+- [X] T024 Run `npm run test` — full suite passes (existing patch-content + surgical-reads tests still green; new graph tests all pass).
+- [X] T025 [P] Reverse-validate per [quickstart.md "Reverse-validation"](quickstart.md#reverse-validation-optional-but-recommended): comment out one of the seven dispatcher cases, re-run tests, confirm the corresponding test fails with a named error, then restore. (Validated: commented out `find_orphan_notes` case, smoke test row failed with named row identifier, then restored.)
+- [ ] T026 [P] Manual verification per [quickstart.md "Manual verification"](quickstart.md#manual-verification-against-a-real-mcp-client) steps 1-5 against a real Obsidian vault: `list_vaults` shows `hasVaultPath: true`; all seven tools called and return non-error responses; `skipped`/`skippedPaths` contract works when a deliberately-corrupt file is added; precondition error fires when `OBSIDIAN_VAULT_PATH` is unset; `note not found:` error fires for missing per-note targets. **DEFERRED to user — requires a real Obsidian vault not present in the implementation environment.**
+- [ ] T027 PR description includes the constitution one-liner: `Principles I–IV considered.` per Constitution Section 4 / Compliance review. **DEFERRED to PR-creation time.**
 
 ---
 

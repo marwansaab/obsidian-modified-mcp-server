@@ -298,15 +298,17 @@ All tools accept an optional `vaultId` argument. If omitted, the server uses the
 
 ### Graph Tools *(requires OBSIDIAN_VAULT_PATH)*
 
-| Tool | Description |
-|------|-------------|
-| `get_vault_stats` | Overview stats (notes, links, orphans, clusters) |
-| `find_orphan_notes` | Notes with no incoming/outgoing links |
-| `get_note_connections` | Incoming/outgoing links + tags for a note |
-| `find_path_between_notes` | Shortest link path between two notes |
-| `get_most_connected_notes` | Top notes by link count or PageRank |
-| `detect_note_clusters` | Community detection via graph analysis |
-| `get_vault_structure` | Folder tree structure of vault |
+Each graph tool requires `OBSIDIAN_VAULT_PATH` to be set for the targeted vault. The two per-note tools (`get_note_connections`, `find_path_between_notes`) return `note not found: <path>` when the target note is not present in the vault — distinct from "found but no connections" (success with empty arrays) and "no path between endpoints" (success with `path: null`). Aggregation tools wrap their primary result in an envelope with `skipped` and `skippedPaths` (up to 50 entries) describing files skipped during the build because of read or parse errors. Full I/O contracts live under [`specs/004-fix-graph-tools/contracts/`](specs/004-fix-graph-tools/contracts/).
+
+| Tool | Description | Contract |
+|------|-------------|----------|
+| `get_vault_stats` | Overview stats (notes, links, orphans, clusters) | [contract](specs/004-fix-graph-tools/contracts/get_vault_stats.md) |
+| `get_vault_structure` | Folder tree structure of vault | [contract](specs/004-fix-graph-tools/contracts/get_vault_structure.md) |
+| `find_orphan_notes` | Notes with no incoming/outgoing links | [contract](specs/004-fix-graph-tools/contracts/find_orphan_notes.md) |
+| `get_note_connections` | Incoming/outgoing links + tags for a note. Returns `note not found: <path>` when missing. | [contract](specs/004-fix-graph-tools/contracts/get_note_connections.md) |
+| `find_path_between_notes` | Shortest link path between two notes. Returns `note not found: <path>` (or `notes not found: <source>, <target>`) when an endpoint is missing. | [contract](specs/004-fix-graph-tools/contracts/find_path_between_notes.md) |
+| `get_most_connected_notes` | Top notes by link count or PageRank | [contract](specs/004-fix-graph-tools/contracts/get_most_connected_notes.md) |
+| `detect_note_clusters` | Community detection via graph analysis | [contract](specs/004-fix-graph-tools/contracts/detect_note_clusters.md) |
 
 ### Semantic Tools *(requires Smart Connections plugin)*
 
