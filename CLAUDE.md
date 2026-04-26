@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
-Active feature plan: [specs/003-surgical-reads/plan.md](specs/003-surgical-reads/plan.md)
+Active feature plan: [specs/004-fix-graph-tools/plan.md](specs/004-fix-graph-tools/plan.md)
 
 For technologies, project structure, validator rules, contracts, and
 test matrices on the current feature, read the plan above and its
