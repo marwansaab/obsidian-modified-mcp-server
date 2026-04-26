@@ -5,6 +5,15 @@
 **Status**: Draft
 **Input**: User description: "Fix Graph Tools — All seven graph tools registered on this MCP advertise their schemas at the JSON layer but return 'Error: Unknown tool: <name>' at runtime when called. Investigate the cause and resolve via one of three paths (wire existing implementations, port from upstream, or withdraw the schemas)."
 
+## Clarifications
+
+### Session 2026-04-26
+
+- Q: How should aggregation graph tools behave when the vault contains malformed notes (broken frontmatter, malformed wikilinks, unreadable files, invalid UTF-8)? → A: Skip-and-continue. Every response payload carries a `skipped` integer (always present, may be `0`) and a `skippedPaths` array of up to 50 entries; if `skipped > skippedPaths.length` the array is truncated. A non-zero `skipped` means the result is partial; callers should interpret accordingly.
+- Q: For per-note tools (`get_note_connections`, `find_path_between_notes`), what should the response be when the target note path is not present in the vault? → A: Precondition-style error naming the missing path (e.g. `note not found: foo/bar.md`). Distinct from "found but no connections" and "found but no path between endpoints". When an explicit `vaultId` was supplied, the error also names the vault id searched. For `find_path_between_notes`, when one or both endpoints are missing, the error names whichever input(s) are not found. The tool's schema description MUST state this contract so LLM callers see the boundary.
+- Q: Under Path C (schemas withdrawn), how should the README communicate the absence of graph tools? → A: One-sentence note in the "Available tools" section listing all seven tool names, stating they are inherited from upstream `@connorbritain/obsidian-mcp-server` but not currently exposed in this fork, with a link to `specs/004-fix-graph-tools/spec.md` for context. Suggested wording: *"Graph tools (`get_vault_stats`, `get_vault_structure`, `find_orphan_notes`, `get_note_connections`, `find_path_between_notes`, `get_most_connected_notes`, `detect_note_clusters`) are inherited from the upstream `@connorbritain/obsidian-mcp-server` but are not currently exposed in this fork. See `specs/004-fix-graph-tools/spec.md` for context."*
+- Q: Should the regression test cover only `get_vault_stats` (FR-006) or also the other six graph tools? → A: Both. Keep the `get_vault_stats` deep test (mock backend + assert payload parsing) AND add a parametrized smoke test covering the other six. Smoke contract: each parameter row calls the tool with minimal valid inputs and asserts the response is NOT an `Unknown tool: <name>` error. Other errors (missing arguments, vault path not configured, etc.) are acceptable — they prove the dispatcher routed the call. The parameter list updates when graph tools are added or removed; the assertion logic stays the same. Captured as FR-013.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Eliminate the contract mismatch (Priority: P1)
@@ -35,12 +44,13 @@ A future contributor refactors the dispatcher (as happened during the `patch_con
 
 1. **Given** the test suite is run on a clean checkout after the fix, **When** the `get_vault_stats` regression test executes, **Then** it passes.
 2. **Given** a contributor removes the `get_vault_stats` branch from the dispatcher, **When** the test suite runs, **Then** the regression test fails with a message that points at the missing dispatch branch (not a generic timeout or unrelated error).
+3. **Given** a contributor removes the dispatcher branch for any of the other six graph tools, **When** the test suite runs, **Then** the parametrized smoke test (FR-013) fails for the specific tool whose branch was removed, naming it in the failure message — making the missing dispatcher branch immediately identifiable.
 
 ---
 
 ### User Story 3 - README reflects post-fix reality (Priority: P3)
 
-A new user reads the README's "Available tools" section to decide whether this MCP fits their needs. After the fix, what they read matches what they get when they call the server: either the seven graph tools are listed with their preconditions (e.g. "requires `OBSIDIAN_VAULT_PATH`"), or they are not listed at all. There is no third state where the README promises capabilities the runtime does not deliver.
+A new user reads the README's "Available tools" section to decide whether this MCP fits their needs. After the fix, what they read matches what they get when they call the server: either the seven graph tools are listed with their preconditions (e.g. "requires `OBSIDIAN_VAULT_PATH`"), or — under Path C — they are surfaced only as a one-sentence "inherited from upstream but not currently exposed in this fork" note pointing at the spec. There is no state where the README promises capabilities the runtime does not deliver, and no state where the absence is silent and unexplained.
 
 **Why this priority**: Important for adoption and trust, but the binary correctness of the contract (US1) and the regression guard (US2) ship value first. README drift is a documentation defect, not a runtime defect.
 
@@ -49,17 +59,19 @@ A new user reads the README's "Available tools" section to decide whether this M
 **Acceptance Scenarios**:
 
 1. **Given** Path A or B was taken, **When** a reader scans the README's "Available tools" section, **Then** the seven graph tools are listed with any required preconditions (e.g. `OBSIDIAN_VAULT_PATH` must be set) stated near each.
-2. **Given** Path C was taken, **When** a reader scans the README's "Available tools" section, **Then** the seven graph tools are absent and the section makes no claim about graph capabilities.
+2. **Given** Path C was taken, **When** a reader scans the README's "Available tools" section, **Then** the seven graph tools are not listed as available capabilities, but a one-sentence note names all seven, states they are inherited from upstream `@connorbritain/obsidian-mcp-server` but not currently exposed in this fork, and links to `specs/004-fix-graph-tools/spec.md` for context.
 
 ---
 
 ### Edge Cases
 
 - **`OBSIDIAN_VAULT_PATH` unset**: When a graph tool is called without the required vault path, the response MUST be a clear precondition error (e.g. "vault path not configured"), never `Unknown tool: <name>`. This applies whether Path A, B, or C is chosen — under Path C the tool is absent, so the question does not arise.
-- **Empty vault (zero notes)**: `get_vault_stats` and similar aggregations MUST return a well-formed payload with zero counts, not throw.
-- **Disconnected notes for `find_path_between_notes`**: When no path exists between two notes, the response MUST indicate "no path" in a recognisable shape (e.g. empty array or `{ path: null }`), not a hard error.
+- **Empty vault (zero notes)**: `get_vault_stats` and similar aggregations MUST return a well-formed payload with zero counts (and `skipped: 0`, `skippedPaths: []`), not throw.
+- **Malformed or unreadable notes**: When a note has broken frontmatter, malformed wikilinks, unreadable contents, or invalid UTF-8, the graph tool MUST skip that note and continue. Every response payload carries `skipped` (integer, always present, may be `0`) and `skippedPaths` (array of up to 50 entries; truncated if `skipped > 50`). A non-zero `skipped` indicates the result is partial. See FR-011.
+- **Missing note path for per-note tools**: When `get_note_connections` or `find_path_between_notes` is called with a note path that is not present in the targeted vault (typo, deleted file, wrong vault), the response MUST be a precondition-style error naming the missing path. This is distinct from the "found but empty" and "found but no path" cases below. See FR-012.
+- **Disconnected notes for `find_path_between_notes`**: When *both* endpoints exist in the vault but no walk connects them, the response MUST indicate "no path" in a recognisable shape (e.g. empty array or `{ path: null }`), not a hard error. (If one or both endpoints are missing entirely, the missing-path edge case above applies instead.)
 - **Vault with thousands of notes**: Graph tools MUST complete in time bounded by the underlying graph library's complexity; this spec does not impose additional latency budgets beyond what users expect from the upstream behaviour.
-- **Path C chosen, then later reversed**: If a future contributor re-adds the schemas, they MUST also wire the dispatcher branches and add tests — the regression test for `get_vault_stats` (US2) is intentionally retained even under Path C, but skipped or marked pending so the scaffold is not lost.
+- **Path C chosen, then later reversed**: If a future contributor re-adds the schemas, they MUST also wire the dispatcher branches and add tests — both the `get_vault_stats` deep regression test (US2 / FR-006) and the parametrized smoke test for the other six tools (FR-013) are intentionally retained even under Path C, but skipped or marked pending so the scaffold is not lost.
 
 ## Requirements *(mandatory)*
 
@@ -71,10 +83,13 @@ A new user reads the README's "Available tools" section to decide whether this M
 - **FR-004**: If Path A or B is chosen, each of the seven graph tools (`get_vault_stats`, `get_vault_structure`, `find_orphan_notes`, `get_note_connections`, `find_path_between_notes`, `get_most_connected_notes`, `detect_note_clusters`) MUST return a non-error payload of a recognisable shape when invoked against a vault with `hasVaultPath: true`.
 - **FR-005**: If Path C is chosen, the seven schemas MUST be removed from the MCP's advertised tool list such that a `ToolSearch` query for any of the seven tool names returns zero results.
 - **FR-006**: A regression test MUST cover `get_vault_stats` end-to-end through the dispatcher, mocking the underlying graph backend and asserting both that the wrapper invokes it correctly and that the mocked response is parsed into the tool result.
-- **FR-007**: The README's "Available tools" section MUST accurately reflect the post-fix reality: under Paths A/B, list the seven tools with any preconditions stated; under Path C, omit them entirely.
+- **FR-007**: The README's "Available tools" section MUST accurately reflect the post-fix reality: under Paths A/B, list the seven tools with any preconditions stated; under Path C, do not list them as available capabilities but include a one-sentence note that names all seven tools, states they are inherited from upstream `@connorbritain/obsidian-mcp-server` but not currently exposed in this fork, and links to `specs/004-fix-graph-tools/spec.md` for context.
 - **FR-008**: Under Paths A and B, each graph tool's description (in the schema advertised over MCP) MUST state any preconditions it requires — at minimum, that `OBSIDIAN_VAULT_PATH` must be set for the targeted vault.
 - **FR-009**: Under Paths A and B, when a graph tool is invoked but its preconditions are unmet (e.g. no vault path configured), the response MUST be a clear precondition error, never `Unknown tool`.
 - **FR-010**: If Path B is chosen, the response shapes and underlying graph-library calls SHOULD follow the upstream `@connorbritain/obsidian-mcp-server` reference unless there is a documented reason to diverge.
+- **FR-011**: Under Paths A and B, every aggregation graph tool (`get_vault_stats`, `get_vault_structure`, `find_orphan_notes`, `get_most_connected_notes`, `detect_note_clusters`) MUST tolerate malformed notes by skipping them rather than aborting. Each response payload MUST include a `skipped` integer (always present, may be `0`) and a `skippedPaths` array of up to 50 entries (truncated when `skipped > 50`). A non-zero `skipped` value signals partial results. (Per-note tools `get_note_connections` and `find_path_between_notes` do not aggregate, so skip-and-continue does not apply — see FR-012 for their not-found / not-parseable contract.)
+- **FR-012**: Under Paths A and B, the per-note tools `get_note_connections` and `find_path_between_notes` MUST return a precondition-style error when a target note path is not present in the targeted vault, distinct from "found but no connections" and "found but no path". The error message MUST name the missing path (e.g. `note not found: foo/bar.md`); when an explicit `vaultId` is supplied, the error MUST also name the vault id searched. For `find_path_between_notes`, if one or both endpoints are missing, the error MUST name whichever input(s) are not found. Each tool's schema description MUST state this contract so LLM callers see the boundary in the catalog. The same error shape applies when the target note is present but cannot be parsed (broken frontmatter / unreadable file / invalid UTF-8).
+- **FR-013**: A parametrized smoke test MUST cover the six graph tools other than `get_vault_stats` (i.e. `get_vault_structure`, `find_orphan_notes`, `get_note_connections`, `find_path_between_notes`, `get_most_connected_notes`, `detect_note_clusters`). Each parameter row MUST call the tool with minimal valid inputs and assert the response is NOT an `Unknown tool: <name>` error. Other error responses (missing arguments, vault path not configured, etc.) are acceptable — they prove the dispatcher routed the call to a handler, which is what this test guards against. When a tool is added to or removed from the graph set, the parameter list updates; the assertion logic stays the same.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -93,6 +108,7 @@ A new user reads the README's "Available tools" section to decide whether this M
 - **SC-003**: The `get_vault_stats` regression test passes on a clean checkout and fails when its dispatch branch is artificially removed, demonstrating it actually guards the contract.
 - **SC-004**: A reader cross-checking the README's "Available tools" section against the live MCP catalog finds no discrepancies in the graph-tools subset.
 - **SC-005**: An LLM caller obtaining vault statistics needs only one tool call (no retry, no fallback to a different tool) — measurable by capturing a transcript of the canonical "what does my vault look like?" interaction.
+- **SC-006**: The parametrized smoke test for the other six graph tools passes on a clean checkout and fails specifically (with a row identifier matching the affected tool name) when any one of those six dispatch branches is artificially removed.
 
 ## Assumptions
 
@@ -100,6 +116,6 @@ A new user reads the README's "Available tools" section to decide whether this M
 - `OBSIDIAN_VAULT_PATH` is the established precondition signal for vault-aware tools, since `list_vaults` already exposes `hasVaultPath` based on it.
 - "Upstream" in Path B refers to `@connorbritain/obsidian-mcp-server`, the fork's parent, where the seven graph tools are reported to work.
 - The exact mocking strategy for the `get_vault_stats` regression test is implementation-defined and depends on which path is taken: HTTP mock if the upstream is invoked over REST, vault-filesystem mock if the implementation is local. The user's brief mentions HTTP mocking, suggesting Path B is the most likely outcome, but this is not prescribed.
-- Response shapes under Paths A/B are implementation-defined. The pass criterion is "recognisable payload of the appropriate shape" — exact field names are not part of the contract this spec enforces.
+- Response shapes under Paths A/B are mostly implementation-defined. The exceptions are the `skipped` and `skippedPaths` fields on aggregation-tool payloads, which are mandated by FR-011. All other field names remain implementation-defined; the pass criterion for them is "recognisable payload of the appropriate shape".
 - Investigation outcome and chosen path will be recorded in the planning artefacts (`research.md`, `plan.md`) under this feature directory, not in the spec itself, since the spec is path-agnostic by design.
 - Path C does not require deletion of any handler source files that may exist — only removal of the schemas from the advertised catalog. This preserves work for a future re-enablement.
