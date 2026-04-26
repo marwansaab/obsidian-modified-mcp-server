@@ -105,7 +105,7 @@ tests/tools/patch-content/
 ```
 
 The full test matrix is in [contracts/patch_content.md §7](./contracts/patch_content.md#7-test-matrix-contract-level)
-(C1–C12). Two patterns to follow:
+(C1–C12 plus C10b and C2b — 14 rows total). Two patterns to follow:
 
 **Schema tests** (`schema.test.ts`): import `isValidHeadingPath` and the
 zod schema directly. Assert pass/fail for each row in the heading-path
@@ -159,7 +159,8 @@ describe('patch_content handler', () => {
     expect(scope.isDone()).toBe(true);
   });
 
-  it('C2: bare heading target → validation error, no HTTP call', async () => {
+  it('C2b: handler-level bare-target rejection → no HTTP call', async () => {
+    nock.disableNetConnect(); // any unintended call would throw NetConnectNotAllowedError
     await expect(
       handlePatchContent(
         {
@@ -173,9 +174,11 @@ describe('patch_content handler', () => {
       )
     ).rejects.toThrow(/full H1::H2.*path/);
     expect(scope.pendingMocks()).toEqual([]); // no mocks were primed; verifies nothing tried to call
+    nock.enableNetConnect(); // restore for subsequent tests
   });
 
-  // ... C3 through C12 follow the same pattern
+  // ... remaining cases (C1's header assertions, C8/C9 pass-through, C10/C10b/C11 upstream errors, C12 registration)
+  // follow the same harness pattern. See contracts/patch_content.md §7 for the full matrix.
 });
 ```
 
@@ -187,11 +190,13 @@ describe('patch_content handler', () => {
 npm test
 ```
 
-Expected: all 12 contract tests pass. If `tools/list` is asserted via
-the `ListToolsRequestSchema` handler (C12), you may need to construct
-the server in-test or move the registration assertion to a unit test
-that imports `ALL_TOOLS` and asserts membership directly. The latter is
-simpler and equally testable.
+Expected: all 14 contract tests pass (C1–C12 plus C10b and C2b), in
+addition to the 2 zod-error-propagation cases in `schema.test.ts`.
+If `tools/list` is asserted via the `ListToolsRequestSchema` handler
+(C12), you may need to construct the server in-test or move the
+registration assertion to a unit test that imports `ALL_TOOLS` and
+asserts membership directly. The latter is simpler and equally
+testable.
 
 ---
 
@@ -252,7 +257,7 @@ Verify:
 
 All of the following must hold:
 
-- [ ] `npm test` exits 0 with all 12 contract tests passing
+- [ ] `npm test` exits 0 with all 14 contract tests (C1–C12 + C10b + C2b) plus the 2 zod-propagation cases passing
 - [ ] `npm run lint` exits 0
 - [ ] `npm run typecheck` exits 0
 - [ ] `npm run build` exits 0
