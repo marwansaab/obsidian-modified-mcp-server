@@ -40,10 +40,11 @@ npm run test
 
 Pass criteria:
 
-- `tests/tools/graph/registration.test.ts` passes — each of the seven tools appears in `ALL_TOOLS` with a derived `inputSchema` of `type: 'object'` and a description containing the precondition phrase.
-- `tests/tools/graph/schema.test.ts` passes — each tool's zod validator rejects malformed input with the expected field path.
+- `tests/tools/graph/registration.test.ts` passes — each of the seven tools appears in `ALL_TOOLS` with a derived `inputSchema` of `type: 'object'` and a description containing the precondition phrase. Per-note tools additionally include the `note not found:` phrase.
+- `tests/tools/graph/schema.test.ts` passes — each tool's zod validator rejects malformed input with the expected field path (eight failure cases across seven tools, covering Constitution Principle II's validation-failure requirement for every tool).
 - `tests/tools/graph/handler-vault-stats.test.ts` passes — the FR-006 deep test successfully mocks `GraphService.getVaultStats`, calls `handleGetVaultStats`, and asserts the wrapper invokes the service correctly and parses the mocked return value into the envelope.
-- `tests/tools/graph/smoke.test.ts` passes — for each of the other six tool names, calling the dispatcher with minimal valid inputs returns a response whose text does NOT contain `Unknown tool`.
+- `tests/tools/graph/handler-per-note.test.ts` passes — happy-path coverage for `get_note_connections` and `find_path_between_notes` (Constitution Principle II), including the FR-012 vault-id suffix and the `find_path_between_notes` "no path found" success case (`{ path: null }`).
+- `tests/tools/graph/smoke.test.ts` passes — for each of the other six tool names, calling the dispatcher with minimal valid inputs returns a response whose text does NOT contain `Unknown tool`. The four aggregation rows additionally assert payload shape (presence of `skipped`, `skippedPaths`, and the primary array/object).
 
 ## Reverse-validation (optional but recommended)
 
@@ -51,7 +52,7 @@ Demonstrate that the regression net actually catches the bug class it's designed
 
 1. Comment out one of the `case` branches in [src/index.ts](../../src/index.ts) — e.g. delete `case 'get_vault_stats':` and its body.
 2. Run `npm run test`.
-3. Observe: the `handler-vault-stats.test.ts` (FR-006) test fails. (Or, if you removed one of the other six, the corresponding row in `smoke.test.ts` fails with a row identifier matching the affected tool name — satisfying SC-006.)
+3. Observe: the `handler-vault-stats.test.ts` (FR-006) test fails. (Or, if you removed one of the four other aggregation tools, the corresponding row in `smoke.test.ts` fails with a row identifier matching the affected tool name — satisfying SC-006. If you removed one of the two per-note tools, both the `handler-per-note.test.ts` happy-path AND the `smoke.test.ts` row will fail.)
 4. Restore the `case` branch.
 5. Re-run tests; they pass again.
 

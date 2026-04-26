@@ -49,4 +49,4 @@ Empty arrays are valid: a note that exists but has no incoming or outgoing links
 { name: 'get_note_connections', args: { filepath: 'smoke-test-nonexistent.md' } }
 ```
 
-The smoke test EXPECTS this call to fail with `note not found: smoke-test-nonexistent.md` — the failure proves the dispatcher routed the call (FR-013 accepts non-`Unknown tool` errors as proof of dispatch).
+The smoke test EXPECTS this call to fail with `note not found: smoke-test-nonexistent.md` — the failure proves the dispatcher routed the call (FR-013 accepts non-`Unknown tool` errors as proof of dispatch). Happy-path coverage for this tool lives in `tests/tools/graph/handler-per-note.test.ts` (Constitution Principle II requirement, addressed by remediation C1).

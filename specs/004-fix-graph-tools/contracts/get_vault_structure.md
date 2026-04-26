@@ -47,4 +47,4 @@ Folders are object keys ending in `/`; files (when `includeFiles: true`) are key
 { name: 'get_vault_structure', args: {} }  // minimal valid; uses defaults
 ```
 
-Smoke assertion: `result.content[0].text` does not match `/Unknown tool/`.
+Smoke assertions: (1) `result.content[0].text` does not contain `Unknown tool` (FR-013 dispatch routing); (2) parsed JSON has top-level `tree` (object), `skipped` (number), `skippedPaths` (array) — closes Constitution Principle II happy-path gap per remediation C2.

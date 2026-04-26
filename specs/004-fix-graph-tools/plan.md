@@ -90,7 +90,8 @@ tests/
     │   ├── registration.test.ts       # NEW: each of 7 tools appears in ALL_TOOLS with derived inputSchema
     │   ├── schema.test.ts             # NEW: zod validation rejects bad inputs (one per tool)
     │   ├── handler-vault-stats.test.ts# NEW: FR-006 deep test (mock GraphService; assert dispatch + payload parsing)
-    │   └── smoke.test.ts              # NEW: FR-013 parametrized smoke test for the other six tools
+    │   ├── handler-per-note.test.ts   # NEW: happy-path tests for get_note_connections + find_path_between_notes (constitution Principle II)
+    │   └── smoke.test.ts              # NEW: FR-013 parametrized smoke test + payload-shape assertions for the four other aggregation tools
     ├── patch-content/                 # (unchanged)
     └── surgical-reads/                # (unchanged)
 ```

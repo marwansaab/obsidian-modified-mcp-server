@@ -124,14 +124,15 @@ This document records the investigation phase the spec mandates as part of resol
 
 ## R10 — Test breadth structure (FR-006 + FR-013 + Constitution Principle II)
 
-**Decision**: Three test files under `tests/tools/graph/`:
+**Decision**: Five test files under `tests/tools/graph/`:
 
-- `registration.test.ts` — for each of the seven tool names: assert it appears in `ALL_TOOLS`, has a derived `inputSchema` of `type: 'object'`, and has a description containing the precondition phrase `OBSIDIAN_VAULT_PATH`.
-- `schema.test.ts` — one zod-validation-failure assertion per tool (e.g. `assertValidGetNoteConnectionsRequest({})` rejects with `filepath` in the field path). Satisfies Principle II's "validation failure" requirement.
-- `handler-vault-stats.test.ts` — FR-006 deep test: mock `GraphService`, call `handleGetVaultStats(args, mockService)`, assert dispatch + payload parsing including `skipped` / `skippedPaths`.
-- `smoke.test.ts` — FR-013 parametrized test: for each of the other six tool names, build a request with minimal valid inputs, call the dispatcher's `handleToolCall(name, args)` against a real `ObsidianMCPServer` instance with a minimal mock vault config, and assert `result.content[0].text` does not match `/Unknown tool/`.
+- `registration.test.ts` — for each of the seven tool names: assert it appears in `ALL_TOOLS`, has a derived `inputSchema` of `type: 'object'`, and has a description containing the precondition phrase `OBSIDIAN_VAULT_PATH`. The two per-note tools additionally must contain the `note not found:` phrase (FR-012).
+- `schema.test.ts` — one happy-path-of-validator assertion AND one validation-failure assertion **per tool** (eight failure cases across seven tools — `find_path_between_notes` gets two, one per required field). Satisfies Constitution Principle II's "validation failure or upstream-error path" requirement for every registered tool.
+- `handler-vault-stats.test.ts` — FR-006 deep test: stub `GraphService`, call `handleGetVaultStats(args, stubService)`, assert dispatch + payload parsing including `skipped` / `skippedPaths` (and the 50-path truncation rule).
+- `handler-per-note.test.ts` — happy-path coverage for `get_note_connections` and `find_path_between_notes` (Constitution Principle II requires every registered tool to have a happy-path test). Includes the FR-012 vault-id suffix propagation case and the `find_path_between_notes` "no path found" success case (return `{ path: null }`).
+- `smoke.test.ts` — FR-013 parametrized dispatcher-routing test for the other six tools. Each row asserts `result.content[0].text` does not contain `Unknown tool`. Additionally, the four aggregation rows assert payload-shape (presence of `skipped` / `skippedPaths` and the primary array/object) — this closes the Constitution Principle II happy-path gap for those four tools without requiring fixture vault contents.
 
-**Rationale**: This split keeps each file focused (registration ↔ catalog drift, schema ↔ validation, handler-vault-stats ↔ wiring + parsing, smoke ↔ dispatcher coverage). It also lets the `Smoke` test catch the *specific* dispatcher-omission bug that motivated this fix — a future contributor who removes one of the seven cases will see exactly which row failed.
+**Rationale**: This split keeps each file focused (registration ↔ catalog drift, schema ↔ validation, handler-vault-stats ↔ wiring + parsing, handler-per-note ↔ per-note happy paths, smoke ↔ dispatcher coverage + aggregation shape). It satisfies Constitution Principle II for every one of the seven tools — every tool has a happy-path assertion (T016 + T016b + T017 shape assertions) and a validation-failure assertion (T015). It also lets the smoke test catch the *specific* dispatcher-omission bug that motivated this fix — a future contributor who removes one of the seven cases will see exactly which row failed.
 
 **Alternatives considered**:
 - *One mega-test-file*: Harder to navigate, slower partial reruns. Rejected.

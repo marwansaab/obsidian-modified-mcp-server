@@ -30,7 +30,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 **Purpose**: Create the new directories and confirm the toolchain is ready. The branch (`004-fix-graph-tools`) already exists.
 
 - [ ] T001 Create directory `src/tools/graph/` (will hold `schemas.ts`, `handlers.ts`, `tool.ts`)
-- [ ] T002 [P] Create directory `tests/tools/graph/` (will hold `registration.test.ts`, `schema.test.ts`, `handler-vault-stats.test.ts`, `smoke.test.ts`)
+- [ ] T002 [P] Create directory `tests/tools/graph/` (will hold `registration.test.ts`, `schema.test.ts`, `handler-vault-stats.test.ts`, `handler-per-note.test.ts`, `smoke.test.ts`)
 - [ ] T003 [P] Confirm `npm run lint`, `npm run typecheck`, `npm run test` all pass on the current `main` baseline as a sanity check before changes (no work to do if green; investigate if not)
 
 **Checkpoint**: Directories exist; baseline is green.
@@ -104,19 +104,40 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 > **NOTE**: These tests are required by spec FRs (FR-006, FR-013) and Constitution Principle II. They are NOT optional.
 
 - [ ] T014 [P] [US2] Create `tests/tools/graph/registration.test.ts` — for each of the seven tool names: assert it appears in `ALL_TOOLS`, has a derived `inputSchema` of `type: 'object'`, and its `description` contains the literal substring `OBSIDIAN_VAULT_PATH` (FR-008 verification). For the two per-note tools, additionally assert the description contains the literal substring `note not found:` (FR-012 verification). Pattern after [tests/tools/patch-content/registration.test.ts](../../tests/tools/patch-content/registration.test.ts).
-- [ ] T015 [P] [US2] Create `tests/tools/graph/schema.test.ts` — for each of the seven `assertValid*Request` validators, assert one happy-path call returns the typed object AND one failure case throws (e.g. `assertValidGetNoteConnectionsRequest({})` throws `ZodError` whose message references `filepath`). Specifically required failure cases: `get_note_connections` missing `filepath`; `find_path_between_notes` missing `source`; `find_path_between_notes` missing `target`; `get_most_connected_notes` with `metric: 'centrality'` (invalid enum); `get_vault_structure` with negative `maxDepth`.
+- [ ] T015 [P] [US2] Create `tests/tools/graph/schema.test.ts` — for each of the seven `assertValid*Request` validators, assert one happy-path call returns the typed object AND one failure case throws (e.g. `assertValidGetNoteConnectionsRequest({})` throws `ZodError` whose message references `filepath`). All seven failure cases MUST be present (one per tool; constitution Principle II requires the validation-failure half for *every* registered tool):
+  - `get_vault_stats` with `vaultId: 42` (type failure on optional `vaultId: string`)
+  - `get_vault_structure` with `maxDepth: -1` (negative integer rejected by `.nonnegative()`)
+  - `find_orphan_notes` with `includeBacklinks: 'yes'` (type failure on optional `includeBacklinks: boolean`)
+  - `get_note_connections` with `{}` (missing required `filepath`)
+  - `find_path_between_notes` with `{ target: 'b.md' }` (missing required `source`)
+  - `find_path_between_notes` with `{ source: 'a.md' }` (missing required `target`)
+  - `get_most_connected_notes` with `metric: 'centrality'` (invalid enum value)
+  - `detect_note_clusters` with `minClusterSize: 0` (rejected by `.positive()`)
+  Note: that's eight failure assertions across seven tools (`find_path_between_notes` gets two — one per required field). The "happy-path" half here tests the validator's typed-return contract, NOT the tool's end-to-end happy path; tool-level happy paths are covered by T016 + T016b.
 - [ ] T016 [P] [US2] Create `tests/tools/graph/handler-vault-stats.test.ts` — FR-006 deep test:
   1. Create a stub `GraphService` (or use `vi.spyOn`) whose `getVaultStats()` returns a fixed `{ totalNotes: 42, totalLinks: 100, orphanCount: 3, tagCount: 17, clusterCount: 5 }` and whose `getLastSkipped()` returns `2`, `getLastSkippedPaths()` returns `['bad1.md', 'bad2.md']`.
   2. Call `await handleGetVaultStats({}, stubService)`.
   3. Assert: `stubService.getVaultStats` was called exactly once with no arguments.
   4. Assert: `result.content[0].text` (parsed as JSON) equals `{ totalNotes: 42, totalLinks: 100, orphanCount: 3, tagCount: 17, clusterCount: 5, skipped: 2, skippedPaths: ['bad1.md', 'bad2.md'] }`.
   5. Add a second test case asserting truncation: when `getLastSkippedPaths()` returns 60 entries, the envelope's `skippedPaths` has exactly 50 entries while `skipped` reports 60.
-- [ ] T017 [P] [US2] Create `tests/tools/graph/smoke.test.ts` — FR-013 parametrized smoke test:
+- [ ] T016b [P] [US2] Create `tests/tools/graph/handler-per-note.test.ts` — happy-path coverage for the two per-note tools (constitution Principle II requires every registered tool to have a happy-path test; the FR-013 smoke deliberately fires error paths for these two and so does NOT satisfy Principle II for them).
+  1. **`handleGetNoteConnections` happy path**: stub `GraphService.getNoteConnections('Daily/2026-04-26.md')` to return `{ filepath: 'Daily/2026-04-26.md', outgoingLinks: ['Projects/Inbox.md'], backlinks: ['Index.md'], tags: ['daily'] }`. Call the handler with `{ filepath: 'Daily/2026-04-26.md' }`. Assert: service called once with the supplied filepath; `result.content[0].text` (parsed as JSON) equals the stubbed return value (no envelope per FR-011 carve-out).
+  2. **`handleGetNoteConnections` `vaultId` propagation**: stub the service's not-found throw to surface `note not found: missing.md`. Call the handler with `{ filepath: 'missing.md', vaultId: 'work' }`. Assert: the error message ends with `(vault: work)` (handler-side suffix per R5 / FR-012).
+  3. **`handleFindPathBetweenNotes` happy path**: stub `GraphService.findPathBetweenNotes('a.md', 'c.md')` to return `['a.md', 'b.md', 'c.md']`. Call the handler with `{ source: 'a.md', target: 'c.md' }`. Assert: `result.content[0].text` parses to `{ path: ['a.md', 'b.md', 'c.md'] }`.
+  4. **`handleFindPathBetweenNotes` no-path-found**: stub the service to return `null` (both endpoints exist, no walk connects them). Call the handler. Assert: `result.content[0].text` parses to `{ path: null }` (the FR-012 distinction between "not found" error and "no path" success).
+- [ ] T017 [P] [US2] Create `tests/tools/graph/smoke.test.ts` — FR-013 parametrized smoke test PLUS payload-shape assertions for the four aggregation rows (constitution Principle II — happy-path code must be asserted, not just exercised):
   1. `describe.each([...])` over the six tool rows from the contracts (one per non-`get_vault_stats` tool, with the minimal valid args specified in each contract's "Smoke-test row" section).
-  2. For each row: instantiate an `ObsidianMCPServer` with a config that has at least one vault with `vaultPath` set to a temporary directory (use `node:os.tmpdir()` joined with a uuid) — the directory can be empty; we only care about dispatch routing, not graph contents.
+  2. For each row: instantiate an `ObsidianMCPServer` with a config that has at least one vault with `vaultPath` set to a temporary directory (use `node:os.tmpdir()` joined with a uuid) — the directory can be empty; we only care about dispatch routing for the per-note rows, and empty-vault aggregation behavior for the four aggregation rows.
   3. Invoke the dispatcher's tool-call entry point for the row's tool name + args. Use the SDK's request/response shape (or call `handleToolCall` directly if it's reachable for testing).
-  4. Assert: `result.content[0].text` does NOT contain the substring `Unknown tool`. Other errors (note-not-found for the per-note tools, etc.) are acceptable per FR-013.
-  5. The test name (visible in vitest output) MUST include the tool name so a failure identifies the affected dispatch branch immediately (SC-006).
+  4. Assert (always): `result.content[0].text` does NOT contain the substring `Unknown tool`. This is the FR-013 dispatch-routing assertion.
+  5. **Additional shape assertions per row** (closes constitution Principle II happy-path gap for the four aggregation tools — for the two per-note tools, only step 4 applies because the smoke args deliberately reference non-existent notes):
+     - `get_vault_structure`: parsed JSON has top-level `tree` (object), `skipped` (number), `skippedPaths` (array).
+     - `find_orphan_notes`: parsed JSON has top-level `orphans` (array), `skipped` (number), `skippedPaths` (array).
+     - `get_most_connected_notes`: parsed JSON has top-level `notes` (array), `skipped` (number), `skippedPaths` (array).
+     - `detect_note_clusters`: parsed JSON has top-level `clusters` (array), `skipped` (number), `skippedPaths` (array).
+     - `get_note_connections`: NO shape assertion (smoke args force a `note not found:` error per the contract — happy path is covered by T016b instead).
+     - `find_path_between_notes`: NO shape assertion (same reason — happy path covered by T016b).
+  6. The test name (visible in vitest output) MUST include the tool name so a failure identifies the affected dispatch branch immediately (SC-006).
 
 **Checkpoint**: All four test files pass. Reverse-validation (per [quickstart.md](quickstart.md) "Reverse-validation" section): commenting out one dispatcher case causes the corresponding test to fail with a clear, named error — proves SC-003 and SC-006 hold.
 
@@ -163,7 +184,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 - **Phase 1 (Setup)**: No dependencies — start immediately.
 - **Phase 2 (Foundational)**: Depends on Phase 1. Blocks ALL user stories. T004-T007 can run in parallel where marked, but T005 and T006 both edit `src/services/graph-service.ts` and MUST be sequential.
 - **Phase 3 (US1)**: Depends on Phase 2. T008 depends on T007 (handlers import schemas). T009 can run in parallel with T008. T010 depends on T009 (edits the same file). T011 depends on T009 (imports the new tool array). T012 depends on T011. T013 depends on T008 (imports the handlers).
-- **Phase 4 (US2)**: Depends on Phase 3. All four test files (T014-T017) are mutually parallel — they touch different files. They can all start as soon as Phase 3 is complete.
+- **Phase 4 (US2)**: Depends on Phase 3. All five test files (T014, T015, T016, T016b, T017) are mutually parallel — they touch different files. They can all start as soon as Phase 3 is complete.
 - **Phase 5 (US3)**: Depends on Phase 3 conceptually (the README documents what now works), but technically only depends on the final tool descriptions being settled (T010). Can run in parallel with Phase 4.
 - **Phase 6 (Polish)**: Depends on all prior phases. T020-T023 are sequential gate checks. T024 and T025 can run in parallel with each other once T023 has passed.
 
@@ -178,7 +199,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 - T002 and T003 in parallel within Phase 1.
 - T004 and T007 in parallel within Phase 2 (different files: `src/types.ts` vs `src/tools/graph/schemas.ts`).
 - T008 and T009 in parallel within Phase 3 (different files: `handlers.ts` vs `tool.ts`).
-- All four test files (T014-T017) in parallel within Phase 4.
+- All five test files (T014, T015, T016, T016b, T017) in parallel within Phase 4.
 - T024 and T025 in parallel within Phase 6 (independent verification activities).
 
 ---
@@ -186,10 +207,11 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 ## Parallel Example: Phase 4 (User Story 2 tests)
 
 ```bash
-# Once Phase 3 is complete, launch all four test files in parallel:
+# Once Phase 3 is complete, launch all five test files in parallel:
 Task: "Create tests/tools/graph/registration.test.ts (T014)"
 Task: "Create tests/tools/graph/schema.test.ts (T015)"
 Task: "Create tests/tools/graph/handler-vault-stats.test.ts (T016)"
+Task: "Create tests/tools/graph/handler-per-note.test.ts (T016b)"
 Task: "Create tests/tools/graph/smoke.test.ts (T017)"
 ```
 

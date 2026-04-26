@@ -49,4 +49,4 @@ No envelope (per-note tool, FR-011 carve-out):
 { name: 'find_path_between_notes', args: { source: 'a.md', target: 'b.md' } }
 ```
 
-Expected to fail with `notes not found: a.md, b.md` (or `note not found: a.md` if only one is missing — depends on what the smoke vault contains). The failure proves dispatch occurred.
+Expected to fail with `notes not found: a.md, b.md` (or `note not found: a.md` if only one is missing — depends on what the smoke vault contains). The failure proves dispatch occurred. Happy-path coverage (including the "no path found" `{ path: null }` success case) lives in `tests/tools/graph/handler-per-note.test.ts` (Constitution Principle II, remediation C1).

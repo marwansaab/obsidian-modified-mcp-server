@@ -47,3 +47,5 @@ Validated by `assertValidGetMostConnectedNotesRequest(args)`.
 ```ts
 { name: 'get_most_connected_notes', args: {} }
 ```
+
+Smoke assertions: (1) `result.content[0].text` does not contain `Unknown tool`; (2) parsed JSON has top-level `notes` (array), `skipped` (number), `skippedPaths` (array) — closes Constitution Principle II happy-path gap per remediation C2.
