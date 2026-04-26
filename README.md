@@ -303,12 +303,32 @@ All tools accept an optional `vaultId` argument. If omitted, the server uses the
 # Watch mode
 npm run dev
 
+# Lint
+npm run lint
+
 # Type check
 npm run typecheck
 
 # Build
 npm run build
+
+# Run the test suite (vitest + nock-mocked HTTP)
+npm test
+
+# Run tests in watch mode
+npm run test:watch
 ```
+
+### Project Constitution & Spec-Driven Workflow
+
+This repo uses [Spec Kit](https://github.com/github/spec-kit) for non-trivial
+features. The project constitution (principles every contribution must
+honor — modular code, public-tool tests, zod boundary validation, explicit
+upstream error propagation) lives in
+[`.specify/memory/constitution.md`](.specify/memory/constitution.md).
+Per-feature specs, plans, contracts, and task lists live under
+[`specs/`](specs/). Pull requests should confirm that constitution
+Principles I–IV were considered.
 
 ## License
 

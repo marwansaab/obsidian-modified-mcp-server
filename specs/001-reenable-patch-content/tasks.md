@@ -98,7 +98,7 @@ description: "Task list for re-enabling the patch_content MCP tool with heading-
 - [X] T016 [P] Run `npm run typecheck` from the repo root; resolve any type errors so it exits with code 0.
 - [X] T017 [P] Run `npm run build` from the repo root; verify `dist/` is produced without errors.
 - [X] T018 Run `npm test` from the repo root; verify all 14 contract tests (C1–C12 plus C10b and C2b) pass, in addition to the two zod-error-propagation cases added by T007.
-- [ ] T019 **(user action — requires real Obsidian)** Smoke-test against a real Obsidian instance per [quickstart.md §7](./quickstart.md#7-smoke-test-against-a-real-obsidian-optional). Confirm both: (a) a valid 2-segment heading patch lands in the correct subsection, and (b) a bare-target call returns a validation error and the Local REST API plugin's request log shows **no** PATCH request was made.
+- [X] T019 Smoke-tested against a real Obsidian instance via `scripts/smoke-patch-content.ts`. All 4 checks passed: (1) setup PUT, (2) valid heading patch — bullet landed under `## Action Items` as expected, (3) bare-target rejection with all 3 message components AND file unchanged (proving validator runs before HTTP), (4) upstream-error propagation — non-existent heading produced `Obsidian API Error 40080: The patch you provided could not be applied to the target content` (status code + upstream message preserved per Constitution IV).
 - [X] T020 Author the PR description per the Constitution Governance section: include a one-line statement confirming Principles I–IV were considered, link to [plan.md](./plan.md), and call out the new dev-tooling additions (vitest, nock, zod-to-json-schema) as the first test infrastructure in the repo. *(Draft delivered in implementation handoff.)*
 
 ---
