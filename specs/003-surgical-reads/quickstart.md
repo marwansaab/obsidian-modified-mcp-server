@@ -28,11 +28,18 @@ async getHeadingContents(filepath: string, headingPath: string): Promise<string>
   return this.safeCall(async () => {
     const encodedPath = filepath.split('/').map(encodeURIComponent).join('/');
     const segments = headingPath.split('::').map(encodeURIComponent).join('/');
+    // We send `Accept: text/markdown` so the upstream returns the heading
+    // body as raw markdown. We deliberately leave `responseType` at axios's
+    // default ('json') so that error responses (which the upstream emits as
+    // JSON regardless of the request's Accept header) are decoded into the
+    // typed `{ errorCode, message }` shape that `safeCall` expects. axios's
+    // `transitional.silentJSONParsing` (default `true` in axios 1.x) makes
+    // successful markdown bodies fall back to the raw string when
+    // `JSON.parse` throws, so the happy path still returns plain markdown.
     const response = await this.client.get<string>(
       `/vault/${encodedPath}/heading/${segments}`,
       {
         headers: { Accept: 'text/markdown' },
-        responseType: 'text',
       }
     );
     return response.data;

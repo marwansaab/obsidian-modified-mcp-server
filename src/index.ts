@@ -19,6 +19,8 @@ import { ObsidianRestService } from './services/obsidian-rest.js';
 import { SmartConnectionsService } from './services/smart-connections.js';
 import { ALL_TOOLS } from './tools/index.js';
 import { handlePatchContent } from './tools/patch-content/handler.js';
+import { handleGetFrontmatterField } from './tools/surgical-reads/handler-frontmatter.js';
+import { handleGetHeadingContents } from './tools/surgical-reads/handler-heading.js';
 
 import type { Config, VaultConfig } from './types.js';
 
@@ -320,6 +322,12 @@ class ObsidianMCPServer {
           content: [{ type: 'text', text: content }],
         };
       }
+
+      case 'get_heading_contents':
+        return handleGetHeadingContents(args, rest);
+
+      case 'get_frontmatter_field':
+        return handleGetFrontmatterField(args, rest);
 
       case 'search': {
         const query = args.query as string;
