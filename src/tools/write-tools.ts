@@ -2,6 +2,8 @@
  * Write operation tools: append, put, patch
  */
 
+import { PATCH_CONTENT_TOOLS } from './patch-content/tool.js';
+
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 export const WRITE_TOOLS: Tool[] = [
@@ -49,39 +51,5 @@ export const WRITE_TOOLS: Tool[] = [
       required: ['filepath', 'content'],
     },
   },
-  // DISABLED: patch_content tool commented out due to known bugs in Obsidian Local REST API
-  // See: https://github.com/coddingtonbear/obsidian-local-rest-api/issues/146
-  // Workaround: Use get_file_contents + put_content for reliable content modification
-  // {
-  //   name: 'patch_content',
-  //   description: 'Insert content relative to a heading, block, or frontmatter in a file.',
-  //   inputSchema: {
-  //     type: 'object',
-  //     properties: {
-  //       filepath: {
-  //         type: 'string',
-  //         description: 'Path to the file (relative to vault root).',
-  //       },
-  //       operation: {
-  //         type: 'string',
-  //         enum: ['append', 'prepend', 'replace'],
-  //         description: 'How to insert the content relative to the target.',
-  //       },
-  //       targetType: {
-  //         type: 'string',
-  //         enum: ['heading', 'block', 'frontmatter'],
-  //         description: 'Type of target to locate.',
-  //       },
-  //       target: {
-  //         type: 'string',
-  //         description: 'The heading text, block ID, or frontmatter key to target.',
-  //       },
-  //       content: {
-  //         type: 'string',
-  //         description: 'The markdown content to insert.',
-  //       },
-  //     },
-  //     required: ['filepath', 'operation', 'targetType', 'target', 'content'],
-  //   },
-  // },
+  ...PATCH_CONTENT_TOOLS,
 ];

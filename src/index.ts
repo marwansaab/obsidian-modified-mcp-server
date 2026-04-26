@@ -18,6 +18,7 @@ import { GraphService } from './services/graph-service.js';
 import { ObsidianRestService } from './services/obsidian-rest.js';
 import { SmartConnectionsService } from './services/smart-connections.js';
 import { ALL_TOOLS } from './tools/index.js';
+import { handlePatchContent } from './tools/patch-content/handler.js';
 
 import type { Config, VaultConfig } from './types.js';
 
@@ -330,24 +331,8 @@ class ObsidianMCPServer {
         };
       }
 
-      // DISABLED: patch_content handler commented out due to known bugs in Obsidian Local REST API
-      // See: https://github.com/coddingtonbear/obsidian-local-rest-api/issues/146
-      // case 'patch_content': {
-      //   const { filepath, operation, targetType, target, content } = args as {
-      //     filepath: string;
-      //     operation: string;
-      //     targetType: string;
-      //     target: string;
-      //     content: string;
-      //   };
-      //   if (!filepath || !operation || !targetType || !target || !content) {
-      //     throw new Error('filepath, operation, targetType, target, and content are required');
-      //   }
-      //   await this.obsidianRest.patchContent(filepath, operation, targetType, target, content);
-      //   return {
-      //     content: [{ type: 'text', text: 'Content patched successfully' }],
-      //   };
-      // }
+      case 'patch_content':
+        return handlePatchContent(args, rest);
 
       case 'append_content': {
         const filepath = args.filepath as string;
