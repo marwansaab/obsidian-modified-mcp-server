@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@marwansaab/obsidian-modified-mcp-server.svg)](https://www.npmjs.com/package/@marwansaab/obsidian-modified-mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This is a personal fork of [`@connorbritain/obsidian-mcp-server`](https://github.com/ConnorBritain/obsidian-mcp-server) by Connor Britain. Its purpose is to mitigate wrapper-side limitations of the Local-REST-API-based MCP server — starting with re-enabling the `patch_content` tool under a structural-only path validator. Subsequent specs will add similar wrapper-level mitigations as the fork evolves.
+This is a personal fork of [`@connorbritain/obsidian-mcp-server`](https://github.com/ConnorBritain/obsidian-mcp-server) by Connor Britain. Its purpose is to mitigate wrapper-side limitations of the Local-REST-API-based MCP server. The first concrete change re-enabled the `patch_content` tool under a structural-only path validator; the second added two surgical-read tools (`get_heading_contents`, `get_frontmatter_field`) that fetch part of a vault note instead of the whole file. Subsequent specs will add similar wrapper-level mitigations as the fork evolves.
 
 > **Status: Personal fork. External support not guaranteed; use at your own discretion.**
 
@@ -24,32 +24,43 @@ TypeScript MCP server for Obsidian with core vault operations, graph analytics, 
 | Change | Description | Rationale |
 |---|---|---|
 | `patch_content` re-enabled | Heading/block/frontmatter PATCH tool is enabled in this fork under a structural-only path validator. | Wraps the same upstream endpoint Connor's fork disabled. The empirically-observed `40080 invalid-target` is a client-side path-mismatch (per [coddingtonbear/obsidian-local-rest-api#146](https://github.com/coddingtonbear/obsidian-local-rest-api/issues/146)), addressable by enforcing fully-qualified heading paths at the wrapper boundary. |
+| `get_heading_contents` + `get_frontmatter_field` added | Two new MCP read tools that fetch part of a vault note instead of the whole file. `get_heading_contents` returns the raw markdown body under a fully-pathed heading (reusing `patch_content`'s structural path validator). `get_frontmatter_field` returns one frontmatter field's value with its original type preserved (string, number, boolean, array, object, or `null`). | Avoids round-tripping the entire file through the MCP transport just to read one section or one field; surfaces the upstream Local REST API's surgical-read endpoints (`GET /vault/{path}/heading/...`, `GET /vault/{path}/frontmatter/{field}`) directly. |
 
-## `patch_content` path discipline
+## Heading-path discipline (`patch_content`, `get_heading_contents`)
 
 To avoid the disambiguation issue tracked in upstream issue
 [coddingtonbear/obsidian-local-rest-api#146](https://github.com/coddingtonbear/obsidian-local-rest-api/issues/146),
 this fork applies a structural validator at the MCP wrapper boundary
-**before** any HTTP call is made.
+**before** any HTTP call is made. The same rule applies to
+`patch_content`'s heading targets and to `get_heading_contents`'s
+`heading` argument — there is exactly one definition of the predicate
+across the codebase.
 
 - **Heading targets MUST be path-shaped.** At least two non-empty
   `::`-separated segments, full path from the document's H1 downward.
-  Use `target: "About This Vault::Frontmatter Conventions"`, **not**
-  `target: "Frontmatter Conventions"`. Bare names are rejected with an
+  Use `"About This Vault::Frontmatter Conventions"`, **not**
+  `"Frontmatter Conventions"`. Bare names are rejected with an
   actionable error message that names the rule, quotes the offending
   value, and shows a corrected example.
 - **Headings whose literal text contains `::`** are unreachable through
-  this tool — the validator treats every `::` as a path separator and
+  these tools — the validator treats every `::` as a path separator and
   there is no escape syntax. Fall back to `get_file_contents` +
-  `put_content` for those edits.
+  `put_content` (write side) or `get_file_contents` + client-side
+  slicing (read side).
 - **Top-level-only headings** (i.e., files with no `::`-separable
-  nesting) are also unreachable through this tool. Same fallback.
-- `block` and `frontmatter` target types pass through to the upstream
-  unchanged.
+  nesting) are also unreachable through these tools. Same fallback.
+- `patch_content`'s `block` and `frontmatter` target types pass through
+  to the upstream unchanged.
+- `get_heading_contents` returns just the raw markdown body under the
+  targeted heading — frontmatter, tags, and file metadata are not
+  included. For frontmatter use `get_frontmatter_field` (single field)
+  or `get_file_contents` (whole note).
 - Upstream errors propagate verbatim with status code and message
-  preserved (no silent fallbacks).
+  preserved (no silent fallbacks). For `get_frontmatter_field` in
+  particular, a present-but-`null` field value (`{"value":null}`) is
+  distinct from a missing field (upstream 4xx surfaced as `isError`).
 
-These three limitations are also stated in the MCP tool's `description`
+These limitations are also stated in each tool's MCP `description`
 field, so they are visible to any caller that lists the available tools.
 
 ## Prerequisites
@@ -245,13 +256,20 @@ All tools accept an optional `vaultId` argument. If omitted, the server uses the
 | `batch_get_file_contents` | Read multiple files concatenated with headers |
 | `delete_file` | Delete file or directory |
 
+### Surgical Read Operations
+
+| Tool | Description |
+|------|-------------|
+| `get_heading_contents` | Read just the raw markdown body under a fully-pathed heading (`H1::H2[::H3...]`). Frontmatter, tags, and file metadata are not included — see [Heading-path discipline](#heading-path-discipline-patch_content-get_heading_contents) above. |
+| `get_frontmatter_field` | Read one frontmatter field's value with its original type preserved (string, number, boolean, array, object, or `null`). Missing fields surface as upstream 4xx errors, distinct from a present-but-`null` value. |
+
 ### Write Operations
 
 | Tool | Description |
 |------|-------------|
 | `append_content` | Append to file (creates if missing) |
 | `put_content` | Overwrite file content |
-| `patch_content` | Insert content relative to a heading, block, or frontmatter target. **Heading targets must use the full `H1::H2[::H3...]` path form** — see [`patch_content` path discipline](#patch_content-path-discipline) above. |
+| `patch_content` | Insert content relative to a heading, block, or frontmatter target. **Heading targets must use the full `H1::H2[::H3...]` path form** — see [Heading-path discipline](#heading-path-discipline-patch_content-get_heading_contents) above. |
 
 ### Search
 
