@@ -72,7 +72,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 - [ ] T012 [US1] Delete `src/tools/graph-tools.ts` (the legacy hand-written JSON schema file). Confirm `npm run typecheck` and `npm run lint` still pass.
 - [ ] T013 [US1] Edit `src/index.ts` — three changes in this single edit:
   1. **Export the class**: change `class ObsidianMCPServer` (line 48) to `export class ObsidianMCPServer` so the smoke test (T019) can `import { ObsidianMCPServer }` and instantiate it.
-  2. **Make the dispatcher accessible**: change `private async handleToolCall(` (line 264) to `public async handleToolCall(` so the smoke test can invoke it directly. (Alternative: keep it private and expose a tiny `_test_invoke(name, args)` helper. Public is simpler and the constitution's modularity principle isn't violated by exposing a single method.)
+  2. **Make the dispatcher accessible**: change `private async handleToolCall(` (line 264) to `public async handleToolCall(` so the smoke test can invoke it directly. (Constitution Principle I's modularity rule isn't violated by exposing a single method that already serves as the public entry point for tool dispatch.)
   3. **Wire the seven graph dispatcher branches**: add seven new `case` branches to the `switch (name)` in `handleToolCall` (between `case 'pattern_search':` at line 462 and `default:` at line 475). Each case:
      - Calls `this.getGraphService(vaultId)` to obtain the `GraphService` instance (this enforces FR-009 — throws if `vault.vaultPath` is unset).
      - Calls the corresponding handler from `./tools/graph/handlers.js`, passing `args` and the service.
@@ -129,7 +129,42 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
   3. **`handleFindPathBetweenNotes` happy path**: stub `GraphService.findPathBetweenNotes('a.md', 'c.md')` to return `['a.md', 'b.md', 'c.md']`. Call the handler with `{ source: 'a.md', target: 'c.md' }`. Assert: `result.content[0].text` parses to `{ path: ['a.md', 'b.md', 'c.md'] }`.
   4. **`handleFindPathBetweenNotes` no-path-found**: stub the service to return `null` (both endpoints exist, no walk connects them). Call the handler. Assert: `result.content[0].text` parses to `{ path: null }` (the FR-012 distinction between "not found" error and "no path" success).
 - [ ] T018 [P] [US2] Create `tests/tools/graph/smoke.test.ts` — FR-013 parametrized smoke test PLUS payload-shape assertions for the four aggregation rows (constitution Principle II — happy-path code must be asserted, not just exercised):
-  1. **Test setup** (per analyze remediation I1): At the top of the file, `vi.mock('../../../src/config.js', ...)` to substitute `getConfig()` with a stub returning `{ defaultVaultId: 'test', vaults: { test: { id: 'test', apiKey: 'unused', host: 'localhost', port: 27123, protocol: 'http' as const, vaultPath: <tmp dir from node:fs.mkdtempSync(node:os.tmpdir() + '/graph-smoke-')>, verifySsl: false } }, graphCacheTtl: 300, verifySsl: false }`. Use `beforeAll` to create the tmp dir and `afterAll` to remove it via `fs.rmSync(dir, { recursive: true, force: true })`. The directory remains empty for the entire test — we don't need real vault contents.
+  1. **Test setup** (per analyze remediations I1 + M1): vitest's `vi.mock(...)` factory is **hoisted** to the top of the module — above all imports and lifecycle hooks — so the tmp-dir variable it references must be created during the same hoisted phase. Use `vi.hoisted(...)` to share the tmp dir between mock factory and the rest of the file:
+
+      ```ts
+      import { describe, it, expect, afterAll, vi } from 'vitest';
+      import * as fs from 'node:fs';
+
+      const { TMP_DIR } = vi.hoisted(() => {
+        const fsLocal = require('node:fs') as typeof import('node:fs');
+        const pathLocal = require('node:path') as typeof import('node:path');
+        const osLocal = require('node:os') as typeof import('node:os');
+        return { TMP_DIR: fsLocal.mkdtempSync(pathLocal.join(osLocal.tmpdir(), 'graph-smoke-')) };
+      });
+
+      vi.mock('../../../src/config.js', () => ({
+        getConfig: () => ({
+          defaultVaultId: 'test',
+          vaults: {
+            test: {
+              id: 'test',
+              apiKey: 'unused',
+              host: 'localhost',
+              port: 27123,
+              protocol: 'http' as const,
+              vaultPath: TMP_DIR,
+              verifySsl: false,
+            },
+          },
+          graphCacheTtl: 300,
+          verifySsl: false,
+        }),
+      }));
+
+      afterAll(() => fs.rmSync(TMP_DIR, { recursive: true, force: true }));
+      ```
+
+      The directory stays empty for the whole test run — we only need a valid `vaultPath` so `getGraphService` doesn't throw the precondition error before dispatch is reached. Aggregation tools then aggregate over zero notes and return well-formed empty payloads; per-note tools fail with `note not found:` (acceptable per FR-013).
   2. `describe.each([...])` over the six tool rows from the contracts (one per non-`get_vault_stats` tool, with the minimal valid args specified in each contract's "Smoke-test row" section).
   3. For each row: instantiate `ObsidianMCPServer` (which T013 made exportable). Invoke the dispatcher via `await server.handleToolCall(name, args)` (T013 made `handleToolCall` public for this purpose).
   4. Assert (always): `result.content[0].text` does NOT contain the substring `Unknown tool`. This is the FR-013 dispatch-routing assertion.
