@@ -20,6 +20,7 @@ import {
   assertValidGetVaultStatsRequest,
   assertValidGetVaultStructureRequest,
 } from './schemas.js';
+import { toOsNativePath } from '../../utils/path-normalisation.js';
 
 import type { GraphService } from '../../services/graph-service.js';
 import type { AggregationEnvelope } from '../../types.js';
@@ -87,8 +88,9 @@ export async function handleGetNoteConnections(
   service: GraphService
 ): Promise<CallToolResult> {
   const req = assertValidGetNoteConnectionsRequest(args);
+  const filepath = toOsNativePath(req.filepath);
   try {
-    const connections = await service.getNoteConnections(req.filepath);
+    const connections = await service.getNoteConnections(filepath);
     return asJson(connections);
   } catch (err) {
     rethrowWithVaultSuffix(err, req.vaultId);
@@ -100,8 +102,10 @@ export async function handleFindPathBetweenNotes(
   service: GraphService
 ): Promise<CallToolResult> {
   const req = assertValidFindPathBetweenNotesRequest(args);
+  const source = toOsNativePath(req.source);
+  const target = toOsNativePath(req.target);
   try {
-    const path = await service.findPathBetweenNotes(req.source, req.target, req.maxDepth);
+    const path = await service.findPathBetweenNotes(source, target, req.maxDepth);
     return asJson({ path });
   } catch (err) {
     rethrowWithVaultSuffix(err, req.vaultId);

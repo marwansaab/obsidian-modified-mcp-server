@@ -29,8 +29,10 @@ import {
 } from './tools/graph/handlers.js';
 import { ALL_TOOLS } from './tools/index.js';
 import { handlePatchContent } from './tools/patch-content/handler.js';
+import { assertValidFindSimilarNotesRequest } from './tools/semantic-tools.js';
 import { handleGetFrontmatterField } from './tools/surgical-reads/handler-frontmatter.js';
 import { handleGetHeadingContents } from './tools/surgical-reads/handler-heading.js';
+import { toForwardSlashPath } from './utils/path-normalisation.js';
 
 import type { Config, VaultConfig } from './types.js';
 
@@ -496,6 +498,18 @@ export class ObsidianMCPServer {
 
       case 'detect_note_clusters':
         return handleDetectNoteClusters(args, this.getGraphService(vaultId));
+
+      case 'find_similar_notes': {
+        const req = assertValidFindSimilarNotesRequest(args);
+        const path = toForwardSlashPath(req.filepath);
+        const results = await this.getSemanticService(vaultId).findSimilar(path, {
+          limit: req.limit,
+          threshold: req.threshold,
+        });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(results, null, 2) }],
+        };
+      }
 
       default: {
         throw new Error(`Unknown tool: ${name}`);

@@ -242,6 +242,8 @@ If running from source:
 
 All tools accept an optional `vaultId` argument. If omitted, the server uses the default vault from your configuration. This lets you read/write multiple Obsidian vaults within the same MCP session.
 
+**Path separators**: every tool that takes a `filepath` (or `source` / `target`) argument accepts forward-slash, backslash, or mixed separators uniformly across platforms. Forward-slash is the canonical form, but Windows-style backslash paths work without modification. See [`specs/006-normalise-graph-paths/`](specs/006-normalise-graph-paths/).
+
 ### Vault Management
 
 | Tool | Description |

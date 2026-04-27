@@ -27,10 +27,10 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives i
 
 **Purpose**: Create the new directories and confirm the toolchain baseline is green. The branch (`006-normalise-graph-paths`) and spec/plan/research/data-model/contracts/quickstart artefacts already exist.
 
-- [ ] T001 Create directory `src/utils/` (will hold `path-normalisation.ts`). The directory does not exist today — it is the first cross-tool helper module in this codebase.
-- [ ] T002 [P] Create directory `tests/utils/` (will hold `path-normalisation.test.ts`).
-- [ ] T003 [P] Create directory `tests/tools/semantic-tools/` (will hold `registration.test.ts`, `schema.test.ts`, `find-similar-handler.test.ts`).
-- [ ] T004 [P] Confirm `npm run lint`, `npm run typecheck`, and `npm run test` all pass on the current branch tip as a baseline. No work to do if green; investigate before proceeding if not.
+- [X] T001 Create directory `src/utils/` (will hold `path-normalisation.ts`). The directory does not exist today — it is the first cross-tool helper module in this codebase.
+- [X] T002 [P] Create directory `tests/utils/` (will hold `path-normalisation.test.ts`).
+- [X] T003 [P] Create directory `tests/tools/semantic-tools/` (will hold `registration.test.ts`, `schema.test.ts`, `find-similar-handler.test.ts`).
+- [X] T004 [P] Confirm `npm run lint`, `npm run typecheck`, and `npm run test` all pass on the current branch tip as a baseline. No work to do if green; investigate before proceeding if not.
 
 **Checkpoint**: Three new directories exist; baseline is green.
 
@@ -42,13 +42,13 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives i
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T005 Create `src/utils/path-normalisation.ts` per [data-model.md § PathNormaliser module](data-model.md#pathnormaliser-module--srcutilspath-normalisationts). Three exports:
+- [X] T005 Create `src/utils/path-normalisation.ts` per [data-model.md § PathNormaliser module](data-model.md#pathnormaliser-module--srcutilspath-normalisationts). Three exports:
   1. `toOsNativePath(p: string): string` — `return p.replace(/[\\/]/g, sep);` where `sep` is imported from `node:path`.
   2. `toForwardSlashPath(p: string): string` — `return p.replace(/[\\/]/g, '/');`.
   3. `isAbsolutePath(p: string): boolean` — `return isAbsolute(p);` where `isAbsolute` is imported from `node:path`. Re-exported for tests to assert separator transforms cannot change absoluteness.
 
   Top-of-file imports: `import { sep, isAbsolute } from 'node:path';`. No other imports. Module has no state and performs no I/O. Add file-header JSDoc explaining the per-tool target choice (cross-references R1 in research.md is fine).
-- [ ] T006 [P] Create `tests/utils/path-normalisation.test.ts` covering the invariants in [data-model.md § PathNormaliser module § Test coverage](data-model.md#pathnormaliser-module--srcutilspath-normalisationts):
+- [X] T006 [P] Create `tests/utils/path-normalisation.test.ts` covering the invariants in [data-model.md § PathNormaliser module § Test coverage](data-model.md#pathnormaliser-module--srcutilspath-normalisationts):
   1. **`toOsNativePath`**:
      - `'a/b/c'` → `\`a${sep}b${sep}c\`` (use `path.sep` so the assertion is platform-correct on both Windows and POSIX).
      - `'a\\b\\c'` → same as above.
@@ -85,7 +85,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives i
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Edit [src/tools/graph/handlers.ts](../../src/tools/graph/handlers.ts) — modify `handleGetNoteConnections` (currently lines 85–96):
+- [X] T007 [US1] Edit [src/tools/graph/handlers.ts](../../src/tools/graph/handlers.ts) — modify `handleGetNoteConnections` (currently lines 85–96):
 
   1. **Add the import** at the top of the file (group with the existing imports near lines 14–22):
      ```ts
@@ -121,7 +121,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives i
 
 > **NOTE**: These tests are required by spec FR-001, FR-005, FR-006, FR-008 and Constitution Principle II. They are NOT optional.
 
-- [ ] T008 [US1] Extend [tests/tools/graph/handler-per-note.test.ts](../../tests/tools/graph/handler-per-note.test.ts) — add a new `describe('handleGetNoteConnections separator regression', ...)` block at the end of the file (after the existing test blocks). The block contains the following `it(...)` cases. Setup: each case sets up a mock `GraphService` whose internal graph is keyed in OS-native form (matching the production `path.relative()` output) by stubbing `service.getNoteConnections(nodePath)` to return a payload when `nodePath` matches the OS-native form and to throw `note not found: <nodePath>` otherwise.
+- [X] T008 [US1] Extend [tests/tools/graph/handler-per-note.test.ts](../../tests/tools/graph/handler-per-note.test.ts) — add a new `describe('handleGetNoteConnections separator regression', ...)` block at the end of the file (after the existing test blocks). The block contains the following `it(...)` cases. Setup: each case sets up a mock `GraphService` whose internal graph is keyed in OS-native form (matching the production `path.relative()` output) by stubbing `service.getNoteConnections(nodePath)` to return a payload when `nodePath` matches the OS-native form and to throw `note not found: <nodePath>` otherwise.
 
   **Case 1: forward-slash input on a nested existing file** (FR-001 / Story 1 Acceptance Scenario 1):
   1. Stub the service so `getNoteConnections('000-Meta' + path.sep + 'Vault Identity.md')` returns `{ filepath: '000-Meta\\Vault Identity.md', outgoingLinks: ['x'], backlinks: ['y'], tags: ['z'] }` (or the equivalent OS-native form on POSIX). Other inputs throw `note not found:`.
@@ -167,7 +167,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives i
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Edit [src/tools/graph/handlers.ts](../../src/tools/graph/handlers.ts) — modify `handleFindPathBetweenNotes` (currently lines 98–109). The import added in T007 is already present; this task only adds the two normalisation calls. Current body:
+- [X] T009 [US2] Edit [src/tools/graph/handlers.ts](../../src/tools/graph/handlers.ts) — modify `handleFindPathBetweenNotes` (currently lines 98–109). The import added in T007 is already present; this task only adds the two normalisation calls. Current body:
   ```ts
   const req = assertValidFindPathBetweenNotesRequest(args);
   try {
@@ -195,7 +195,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives i
 
 > **NOTE**: These tests are required by spec FR-002, FR-005, FR-006 and Constitution Principle II.
 
-- [ ] T010 [US2] Extend [tests/tools/graph/handler-per-note.test.ts](../../tests/tools/graph/handler-per-note.test.ts) — add a `describe('handleFindPathBetweenNotes separator regression', ...)` block. Reuse the same mock-service helper from T008 (extend if needed to back `findPathBetweenNotes`). The block contains:
+- [X] T010 [US2] Extend [tests/tools/graph/handler-per-note.test.ts](../../tests/tools/graph/handler-per-note.test.ts) — add a `describe('handleFindPathBetweenNotes separator regression', ...)` block. Reuse the same mock-service helper from T008 (extend if needed to back `findPathBetweenNotes`). The block contains:
 
   **Case 1: forward-slash on both args, path exists** (FR-002 / Story 2 Acceptance Scenario 1):
   1. Stub `service.findPathBetweenNotes(<os-native source>, <os-native target>, ...)` to return `['000-Meta\\A.md', '000-Meta\\Bridge.md', '010-Notes\\B.md']` (OS-native node IDs).
@@ -246,7 +246,7 @@ This phase delivers the largest implementation surface of the three user stories
 
 ### Implementation for User Story 3
 
-- [ ] T011 [US3] Edit [src/tools/semantic-tools.ts](../../src/tools/semantic-tools.ts) — replace the hand-written JSON schema for `find_similar_notes` (currently lines 49–74 — the second object in the `SEMANTIC_TOOLS` array) with a zod-derived schema. Steps:
+- [X] T011 [US3] Edit [src/tools/semantic-tools.ts](../../src/tools/semantic-tools.ts) — replace the hand-written JSON schema for `find_similar_notes` (currently lines 49–74 — the second object in the `SEMANTIC_TOOLS` array) with a zod-derived schema. Steps:
 
   1. **Add imports** at the top of the file:
      ```ts
@@ -279,7 +279,7 @@ This phase delivers the largest implementation surface of the three user stories
   3. **Replace the `find_similar_notes` registration entry** (the second array element in `SEMANTIC_TOOLS`) so its `inputSchema` is `toJsonSchema(FindSimilarNotesRequestSchema)`. The `name` and `description` stay verbatim. The hand-written `inputSchema` JSON literal is removed.
   4. **DO NOT modify the `semantic_search` registration entry** (the first array element). It is also unwired in the dispatcher and uses a hand-written JSON schema, but it is OUT OF SCOPE for this feature ([research.md § R5](research.md#r5--dispatcher-gap-for-find_similar_notes)). Leave it untouched.
   5. Run `npm run typecheck` to confirm everything compiles.
-- [ ] T012 [US3] Edit [src/index.ts](../../src/index.ts) — wire the `find_similar_notes` dispatcher case. Three changes in this single edit:
+- [X] T012 [US3] Edit [src/index.ts](../../src/index.ts) — wire the `find_similar_notes` dispatcher case. Three changes in this single edit:
 
   1. **Add imports** at the top of the file (group with the other handler/schema imports near lines 20–33):
      ```ts
@@ -308,13 +308,13 @@ This phase delivers the largest implementation surface of the three user stories
 
 > **NOTE**: These tests are required by spec FR-003, FR-004, FR-005 and Constitution Principle II.
 
-- [ ] T013 [P] [US3] Create `tests/tools/semantic-tools/registration.test.ts` — assertions:
+- [X] T013 [P] [US3] Create `tests/tools/semantic-tools/registration.test.ts` — assertions:
   1. `find_similar_notes` appears in `ALL_TOOLS` exactly once (catches accidental duplicate registration).
   2. Its `inputSchema` is the `zodToJsonSchema` derivative of `FindSimilarNotesRequestSchema` — re-derive in the test and deep-compare via `expect(tool.inputSchema).toEqual(zodToJsonSchema(FindSimilarNotesRequestSchema, { $refStrategy: 'none' }))`. Pattern from [tests/tools/patch-content/registration.test.ts](../../tests/tools/patch-content/registration.test.ts).
   3. Its `description` is unchanged from the pre-fix value (`'Find notes semantically similar to a given note.'`) — this feature does not change the tool's description text.
   4. The `inputSchema.properties.filepath.description` (post-zodToJsonSchema) contains the literal substring `"Forward-slash or backslash separators both accepted"` — locks in the documentation half of FR-007.
   5. `semantic_search` also appears in `ALL_TOOLS` (regression safety — we did not accidentally remove it while editing the file).
-- [ ] T014 [P] [US3] Create `tests/tools/semantic-tools/schema.test.ts` — assertions for `FindSimilarNotesRequestSchema`:
+- [X] T014 [P] [US3] Create `tests/tools/semantic-tools/schema.test.ts` — assertions for `FindSimilarNotesRequestSchema`:
   1. `assertValidFindSimilarNotesRequest({ filepath: 'foo.md' })` returns `{ filepath: 'foo.md' }` — minimal valid input.
   2. `assertValidFindSimilarNotesRequest({ filepath: 'foo.md', limit: 5, threshold: 0.7, vaultId: 'work' })` returns the full typed object.
   3. `assertValidFindSimilarNotesRequest({})` throws `ZodError` whose error path includes `filepath`.
@@ -324,7 +324,7 @@ This phase delivers the largest implementation surface of the three user stories
   7. `assertValidFindSimilarNotesRequest({ filepath: 'foo.md', limit: 1.5 })` throws `ZodError` (`.int()` constraint).
   8. `assertValidFindSimilarNotesRequest({ filepath: 'foo.md', threshold: 1.5 })` throws `ZodError` (`.max(1)` constraint).
   9. `assertValidFindSimilarNotesRequest({ filepath: 'foo.md', threshold: -0.1 })` throws `ZodError` (`.min(0)` constraint).
-- [ ] T015 [P] [US3] Create `tests/tools/semantic-tools/find-similar-handler.test.ts` — end-to-end dispatch via `server.handleToolCall('find_similar_notes', args)` with `nock`-mocked Smart Connections backend. Pattern after [tests/tools/patch-content/handler.test.ts](../../tests/tools/patch-content/handler.test.ts) for the nock setup. Test cases:
+- [X] T015 [P] [US3] Create `tests/tools/semantic-tools/find-similar-handler.test.ts` — end-to-end dispatch via `server.handleToolCall('find_similar_notes', args)` with `nock`-mocked Smart Connections backend. Pattern after [tests/tools/patch-content/handler.test.ts](../../tests/tools/patch-content/handler.test.ts) for the nock setup. Test cases:
 
   **Setup**: each test instantiates `ObsidianMCPServer` and configures one vault with `smartConnectionsPort` set so `getSemanticService` succeeds. The vault config also has the matching `host`, `port`, `apiKey` so the axios client routes mocked traffic correctly. Use `vi.spyOn` or environment-variable seeding to inject the test vault config — pattern from the existing patch-content handler test.
 
@@ -370,13 +370,13 @@ This phase delivers the largest implementation surface of the three user stories
 
 **Purpose**: Pre-merge quality gates. The constitution requires lint + typecheck + build + test all to pass before merge.
 
-- [ ] T016 Run `npm run lint` — fix any new warnings introduced by Phases 2–5. Zero warnings required (constitution Section 2). Pay particular attention to unused imports in `handlers.ts` (the new `toOsNativePath` import is used twice — confirm) and `semantic-tools.ts` (the new `z`, `zodToJsonSchema`, `ZodTypeAny` imports must all be used).
-- [ ] T017 Run `npm run typecheck` — zero errors required. The newly-typed `req` from `assertValidFindSimilarNotesRequest` should narrow correctly through the dispatcher case; the `findSimilar(path, { limit, threshold })` call must satisfy `SmartConnectionsService.findSimilar`'s parameter types.
-- [ ] T018 Run `npm run build` — confirm `tsup` produces a clean bundle that includes `dist/utils/path-normalisation.js` and the modified `dist/tools/semantic-tools.js`.
-- [ ] T019 Run `npm run test` — full suite passes: existing patch-content + surgical-reads + graph + delete-file tests still green; the new path-normalisation, graph regression, and semantic-tools tests all pass. Specifically check that the existing `tests/tools/graph/handler-per-note.test.ts` cases (pre-existing ones, not the new separator regression cases from T008/T010) still pass after the handler edits.
+- [X] T016 Run `npm run lint` — fix any new warnings introduced by Phases 2–5. Zero warnings required (constitution Section 2). Pay particular attention to unused imports in `handlers.ts` (the new `toOsNativePath` import is used twice — confirm) and `semantic-tools.ts` (the new `z`, `zodToJsonSchema`, `ZodTypeAny` imports must all be used).
+- [X] T017 Run `npm run typecheck` — zero errors required. The newly-typed `req` from `assertValidFindSimilarNotesRequest` should narrow correctly through the dispatcher case; the `findSimilar(path, { limit, threshold })` call must satisfy `SmartConnectionsService.findSimilar`'s parameter types.
+- [X] T018 Run `npm run build` — confirm `tsup` produces a clean bundle that includes `dist/utils/path-normalisation.js` and the modified `dist/tools/semantic-tools.js`.
+- [X] T019 Run `npm run test` — full suite passes: existing patch-content + surgical-reads + graph + delete-file tests still green; the new path-normalisation, graph regression, and semantic-tools tests all pass. Specifically check that the existing `tests/tools/graph/handler-per-note.test.ts` cases (pre-existing ones, not the new separator regression cases from T008/T010) still pass after the handler edits.
 - [ ] T020 [P] Reverse-validation against the bug report: against a real Obsidian vault on Windows, run all three reproduction flows from [quickstart.md § 1.2](quickstart.md). Assert the "expected (post-fix)" outcomes hold: forward-slash input returns a payload, backslash returns the same payload, the originally-failing reproduction (`get_note_connections` with `filepath: "000-Meta/Vault Identity.md"`) now succeeds. **POSIX coverage** (SC-004): if POSIX access is available, also run `npm run test` once on macOS or Linux to confirm the helper's `path.sep` abstraction holds on a non-Windows host; otherwise accept the implicit coverage from T006's `path.sep`-aware assertions and the cross-platform-ness of the `replace(/[\\/]/g, ...)` regex. **DEFER to user — Windows half requires a real Obsidian vault; POSIX half requires POSIX access.**
 - [ ] T021 [P] PR description includes the constitution one-liner: `Principles I–IV considered.` per Constitution Section 4 / Compliance review. **DEFER to PR-creation time.**
-- [ ] T022 [P] Edit [README.md](../../README.md) — under the section that lists graph and semantic tools (or wherever path arguments are documented), add a one-line note that all path-taking tools accept either forward-slash or backslash separators uniformly across platforms, matching the rest of the wrapper's surface. Exact placement is the user's call; minimum viable: a small "Path separators" callout near the affected tool tables. Optional but improves Windows-user discoverability of the wrapper's separator-tolerance contract. Not blocking — does not satisfy any FR; addresses S1 from the `/speckit-analyze` report.
+- [X] T022 [P] Edit [README.md](../../README.md) — under the section that lists graph and semantic tools (or wherever path arguments are documented), add a one-line note that all path-taking tools accept either forward-slash or backslash separators uniformly across platforms, matching the rest of the wrapper's surface. Exact placement is the user's call; minimum viable: a small "Path separators" callout near the affected tool tables. Optional but improves Windows-user discoverability of the wrapper's separator-tolerance contract. Not blocking — does not satisfy any FR; addresses S1 from the `/speckit-analyze` report.
 
 ---
 
