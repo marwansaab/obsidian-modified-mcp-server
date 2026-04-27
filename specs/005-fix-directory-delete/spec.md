@@ -12,6 +12,8 @@
 - Q: When the recursive walk aborts mid-flight because a contained child failed to delete, what should the error response include beyond naming the offender? → A: Include the offending child path plus the list of child paths that were already successfully deleted before the abort.
 - Q: What should the success response include on a recursive directory delete? → A: A success indicator naming the deleted directory plus summary counts of how many files and how many subdirectories were removed (no full path inventory).
 - Q: How should the wrapper handle a verification re-query that itself fails (whether by transport timeout or by a non-timeout upstream error such as 5xx)? → A: Treat any verification-query failure (timeout or non-timeout error) uniformly as "outcome undetermined" — single shot, no retry.
+- Q: What is the scope of the "already-deleted child paths" list in the partial-failure error response — direct children only, or every successfully removed path during the recursive walk? → A: Every successfully removed path during the recursive walk (files and intermediate subdirectories), each as a full relative path under the target directory.
+- Q: In what order should the recursive walk visit children? → A: In the order returned by the upstream listing endpoint, with no extra sorting in the wrapper. Tests pin order via the mocked listing fixture.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -27,7 +29,7 @@ An LLM caller (or an integration consuming this MCP server) wants to remove a di
 
 1. **Given** a directory `1000- Testing-to-be-deleted/` that contains one file `test.md`, **When** the caller invokes `delete_file` with `1000- Testing-to-be-deleted`, **Then** the tool returns a clear success indicator and the directory is no longer present in the parent's listing.
 2. **Given** a directory containing both files and a nested non-empty subdirectory, **When** the caller invokes `delete_file` on the outer directory, **Then** every file and subdirectory underneath is removed and the outer directory is removed last; the returned success indicator reflects the consolidated outcome.
-3. **Given** a non-empty directory in which one contained file cannot be removed (for example, the upstream rejects the per-item delete), **When** the caller invokes `delete_file` on the directory, **Then** the wrapper aborts before issuing the final directory delete and returns an error that names the specific child path that could not be removed AND lists the child paths that were already successfully deleted before the abort; the outer directory remains in place because it is still non-empty.
+3. **Given** a non-empty directory in which one contained file cannot be removed (for example, the upstream rejects the per-item delete), **When** the caller invokes `delete_file` on the directory, **Then** the wrapper aborts before issuing the final directory delete and returns an error that names the specific path that could not be removed AND lists every path that was successfully deleted during the recursive walk before the abort (files and intermediate subdirectories alike, each as a full relative path under the target); the outer directory remains in place because it is still non-empty.
 
 ---
 
@@ -79,7 +81,7 @@ LLM callers discover the `delete_file` contract through the MCP tool schema. Aft
 ### Edge Cases
 
 - **Recursion depth**: Deeply nested subdirectories (multiple levels) must all be removed. The wrapper traverses contents to whatever depth is present.
-- **Mid-traversal failure**: If any contained file or subdirectory fails to delete, the wrapper aborts before issuing the outer directory delete and returns an error that names the offending child path AND lists the child paths that were already successfully deleted before the abort. Items already deleted before the failure remain deleted (best-effort, no rollback).
+- **Mid-traversal failure**: If any contained file or subdirectory fails to delete, the wrapper aborts before issuing the outer directory delete and returns an error that names the offending path AND lists every path successfully deleted during the recursive walk before the abort (files and intermediate subdirectories alike, each as a full relative path under the target). Items already deleted before the failure remain deleted (best-effort, no rollback).
 - **Empty directory**: Recursive delete on a directory with no contents skips the iteration step and goes straight to the final directory delete; the response remains coherent with the post-condition on the vault.
 - **Path is a file, not a directory**: The existing single-file delete behaviour is preserved; the recursive logic only engages when the path resolves to a directory.
 - **Path does not exist**: The caller receives a clear "not found" error — neither a transport-timeout nor a generic upstream failure.
@@ -94,7 +96,7 @@ LLM callers discover the `delete_file` contract through the MCP tool schema. Aft
 
 - **FR-001**: When the path passed to `delete_file` resolves to a directory, the wrapper MUST list the directory's contents, delete each contained file and subdirectory (recursively for subdirectories), and then delete the now-empty directory itself, all within a single tool invocation. On success the wrapper MUST return a success indicator that names the deleted directory and includes summary counts of the number of files removed and the number of subdirectories removed during the recursive walk (no full path inventory). For a single-file delete or an empty-directory delete the counts are 0.
 - **FR-002**: The caller MUST NOT be required to empty a directory before invoking `delete_file` on it; recursive emptying is the wrapper's responsibility.
-- **FR-003**: If any contained file or subdirectory fails to delete during the recursive walk, the wrapper MUST abort before issuing the final directory delete, MUST NOT remove the outer directory, and MUST return an error that (a) names the specific child path that could not be removed and (b) lists the child paths that were already successfully deleted before the abort, so the caller can reason about the partial vault state.
+- **FR-003**: If any contained file or subdirectory fails to delete during the recursive walk, the wrapper MUST abort before issuing the final directory delete, MUST NOT remove the outer directory, and MUST return an error that (a) names the specific path that could not be removed and (b) lists every path successfully deleted during the recursive walk before the abort — files AND intermediate subdirectories alike, each presented as a full relative path under the target directory — so the caller can reason about the partial vault state.
 - **FR-004**: When an upstream HTTP call made by the wrapper exceeds the wrapper's transport timeout, the wrapper MUST perform a verification listing query on the relevant parent (or vault root) to determine the actual post-condition on the vault before returning a status to the caller.
 - **FR-005**: The wrapper MUST NOT return a transport-timeout error when the post-condition on the vault matches the success expected by the call (the directory is absent for a delete).
 - **FR-006**: The wrapper MUST NOT return a success indicator when the post-condition on the vault contradicts success (the directory is still present after a delete attempt).
@@ -105,6 +107,7 @@ LLM callers discover the `delete_file` contract through the MCP tool schema. Aft
 - **FR-011**: The MCP tool schema description for `delete_file` MUST state that, when the path refers to a directory, the deletion is recursive (the directory itself plus all contained files and subdirectories).
 - **FR-012**: An automated regression test MUST cover the non-empty-directory case end-to-end against a stand-in upstream and assert that the wrapper iterates the contained files, issues a per-item delete for each, issues the final directory delete, and reports the consolidated outcome.
 - **FR-013**: An automated regression test MUST cover the timeout-with-actual-success case (the upstream delete on the directory does not respond within the transport timeout but the directory is absent on the follow-up listing) and assert that the wrapper reports success rather than the raw transport timeout.
+- **FR-014**: The recursive walk MUST visit children in the order returned by the upstream listing endpoint (no in-wrapper sorting or reordering). The wrapper makes no ordering guarantee independent of the upstream's listing — the upstream's order is the wrapper's order. This means the partial-failure deleted-paths list (FR-003) reflects upstream listing order, and regression tests pin that order via the mocked listing fixture.
 
 ### Key Entities
 
@@ -112,7 +115,7 @@ LLM callers discover the `delete_file` contract through the MCP tool schema. Aft
 - **Directory listing**: The set of immediate children (files and subdirectories) under a given directory path, as observed via the wrapper's listing query against the upstream. Used both to drive the recursive walk and to verify post-conditions after a transport timeout.
 - **Tool outcome**: The structured response returned to the caller. Has two coherent shapes:
   - **Success** — names the deleted path and, for a recursive directory delete, includes summary counts (number of files removed, number of subdirectories removed). For a single-file or empty-directory delete the counts are 0.
-  - **Error** — names a specific reason: "not found", "child failed: <path>" (with the list of children already successfully deleted before the abort), or "outcome undetermined" (verification query itself did not return).
+  - **Error** — names a specific reason: "not found", "child failed: <path>" (with a flat list of every path successfully deleted during the recursive walk before the abort — files and intermediate subdirectories alike, each as a full relative path under the target), or "outcome undetermined" (verification query itself did not return).
   Never the raw transport-timeout when a post-condition observation was possible.
 
 ## Success Criteria *(mandatory)*
