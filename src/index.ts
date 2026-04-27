@@ -17,6 +17,7 @@ import { getConfig } from './config.js';
 import { GraphService } from './services/graph-service.js';
 import { ObsidianRestService } from './services/obsidian-rest.js';
 import { SmartConnectionsService } from './services/smart-connections.js';
+import { handleDeleteFile } from './tools/delete-file/handler.js';
 import {
   handleDetectNoteClusters,
   handleFindOrphanNotes,
@@ -371,14 +372,8 @@ export class ObsidianMCPServer {
         };
       }
 
-      case 'delete_file': {
-        const filepath = args.filepath as string;
-        if (!filepath) throw new Error('filepath is required');
-        await rest.deleteFile(filepath);
-        return {
-          content: [{ type: 'text', text: 'File deleted successfully' }],
-        };
-      }
+      case 'delete_file':
+        return handleDeleteFile(args, rest);
 
       case 'batch_get_file_contents': {
         const filepaths = args.filepaths as string[];

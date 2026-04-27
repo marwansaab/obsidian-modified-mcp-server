@@ -6,6 +6,12 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import https from 'node:https';
 
+import {
+  ObsidianApiError,
+  ObsidianNotFoundError,
+  ObsidianTimeoutError,
+} from './obsidian-rest-errors.js';
+
 import type { SearchResult, VaultConfig } from '../types.js';
 
 export class ObsidianRestService {
@@ -40,7 +46,14 @@ export class ObsidianRestService {
         const data = error.response?.data as { errorCode?: number; message?: string } | undefined;
         const code = data?.errorCode ?? error.response?.status ?? -1;
         const message = data?.message ?? error.message ?? 'Unknown error';
-        throw new Error(`Obsidian API Error ${code}: ${message}`);
+        const formatted = `Obsidian API Error ${code}: ${message}`;
+        if (error.code === 'ECONNABORTED') {
+          throw new ObsidianTimeoutError(this.client.defaults.timeout ?? 0, formatted, error);
+        }
+        if (error.response?.status === 404) {
+          throw new ObsidianNotFoundError(formatted, error);
+        }
+        throw new ObsidianApiError(typeof code === 'number' ? code : -1, formatted, error);
       }
       throw error;
     }

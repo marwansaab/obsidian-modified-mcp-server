@@ -254,7 +254,7 @@ All tools accept an optional `vaultId` argument. If omitted, the server uses the
 | `list_files_in_dir` | List files in a specific directory |
 | `get_file_contents` | Read a single file |
 | `batch_get_file_contents` | Read multiple files concatenated with headers |
-| `delete_file` | Delete file or directory |
+| `delete_file` | Delete a file or directory. **Directory paths are deleted recursively** — the wrapper removes every contained file and subdirectory before deleting the directory itself, in a single tool call. On a transport timeout the wrapper verifies post-condition via a parent listing before reporting outcome. |
 
 ### Surgical Read Operations
 

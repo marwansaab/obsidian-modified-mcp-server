@@ -27,9 +27,9 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 **Purpose**: Create the new directories and confirm the toolchain baseline is green. The branch (`005-fix-directory-delete`) and spec/plan/research artefacts already exist.
 
-- [ ] T001 Create directory `src/tools/delete-file/` (will hold `schema.ts`, `tool.ts`, `handler.ts`, `recursive-delete.ts`, `verify-then-report.ts`)
-- [ ] T002 [P] Create directory `tests/tools/delete-file/` (will hold `registration.test.ts`, `schema.test.ts`, `single-file.test.ts`, `recursive.test.ts`, `partial-failure.test.ts`, `timeout-verify.test.ts`, `not-found.test.ts`)
-- [ ] T003 [P] Confirm `npm run lint`, `npm run typecheck`, and `npm run test` all pass on the current branch tip as a sanity baseline. No work to do if green; investigate before proceeding if not.
+- [X] T001 Create directory `src/tools/delete-file/` (will hold `schema.ts`, `tool.ts`, `handler.ts`, `recursive-delete.ts`, `verify-then-report.ts`)
+- [X] T002 [P] Create directory `tests/tools/delete-file/` (will hold `registration.test.ts`, `schema.test.ts`, `single-file.test.ts`, `recursive.test.ts`, `partial-failure.test.ts`, `timeout-verify.test.ts`, `not-found.test.ts`)
+- [X] T003 [P] Confirm `npm run lint`, `npm run typecheck`, and `npm run test` all pass on the current branch tip as a sanity baseline. No work to do if green; investigate before proceeding if not.
 
 **Checkpoint**: Directories exist; baseline is green.
 
@@ -41,20 +41,20 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T004 Create `src/services/obsidian-rest-errors.ts` — three error classes (`ObsidianTimeoutError`, `ObsidianNotFoundError`, `ObsidianApiError`) all extending `Error`, each preserving the existing `Obsidian API Error <code>: <message>` text on `.message` for behavioural compatibility, plus type guards `isObsidianTimeoutError(e)` and `isObsidianNotFoundError(e)`. Match the field shapes documented in [data-model.md § ObsidianTimeoutError / ObsidianNotFoundError / ObsidianApiError](data-model.md). The original `AxiosError` is preserved on `.cause`.
-- [ ] T005 Edit `src/services/obsidian-rest.ts` — replace the `safeCall` body's `catch` block (lines 38–46) so that when `error instanceof AxiosError`:
+- [X] T004 Create `src/services/obsidian-rest-errors.ts` — three error classes (`ObsidianTimeoutError`, `ObsidianNotFoundError`, `ObsidianApiError`) all extending `Error`, each preserving the existing `Obsidian API Error <code>: <message>` text on `.message` for behavioural compatibility, plus type guards `isObsidianTimeoutError(e)` and `isObsidianNotFoundError(e)`. Match the field shapes documented in [data-model.md § ObsidianTimeoutError / ObsidianNotFoundError / ObsidianApiError](data-model.md). The original `AxiosError` is preserved on `.cause`.
+- [X] T005 Edit `src/services/obsidian-rest.ts` — replace the `safeCall` body's `catch` block (lines 38–46) so that when `error instanceof AxiosError`:
   1. Compute `formatted = \`Obsidian API Error ${code}: ${message}\`` exactly as today (preserving the message text every other tool sees).
   2. If `error.code === 'ECONNABORTED'` → throw `new ObsidianTimeoutError(this.client.defaults.timeout ?? 0, formatted, error)`.
   3. Else if `error.response?.status === 404` → throw `new ObsidianNotFoundError(formatted, error)`.
   4. Else → throw `new ObsidianApiError(typeof code === 'number' ? code : -1, formatted, error)`.
   Add the import for the three classes at the top of the file. **Behavioural compatibility check**: every existing tool's tests should still pass unchanged after this edit, because each subclass extends `Error` with the same `.message`. Run `npm run test` before moving on.
-- [ ] T006 [P] Create `src/tools/delete-file/schema.ts` — define `DeleteFileRequestSchema` (`z.object({ filepath: z.string().trim().min(1, 'filepath is required'), vaultId: z.string().trim().optional() })`), export the inferred type `DeleteFileRequest`, and export `assertValidDeleteFileRequest(args: unknown): DeleteFileRequest` that calls `DeleteFileRequestSchema.parse(args)`. Pattern after [src/tools/patch-content/schema.ts](../../src/tools/patch-content/schema.ts).
-- [ ] T007 [P] Create `src/tools/delete-file/verify-then-report.ts` — export `attemptWithVerification<T>(operation: () => Promise<T>, verify: () => Promise<'absent' | 'present'>): Promise<{ outcome: 'success' } | { outcome: 'failure'; cause: ObsidianTimeoutError }>`. Behaviour per [data-model.md § TimeoutVerificationOutcome](data-model.md) and [research.md § R4](research.md#r4--timeout-then-verify-mechanics):
+- [X] T006 [P] Create `src/tools/delete-file/schema.ts` — define `DeleteFileRequestSchema` (`z.object({ filepath: z.string().trim().min(1, 'filepath is required'), vaultId: z.string().trim().optional() })`), export the inferred type `DeleteFileRequest`, and export `assertValidDeleteFileRequest(args: unknown): DeleteFileRequest` that calls `DeleteFileRequestSchema.parse(args)`. Pattern after [src/tools/patch-content/schema.ts](../../src/tools/patch-content/schema.ts).
+- [X] T007 [P] Create `src/tools/delete-file/verify-then-report.ts` — export `attemptWithVerification<T>(operation: () => Promise<T>, verify: () => Promise<'absent' | 'present'>): Promise<{ outcome: 'success' } | { outcome: 'failure'; cause: ObsidianTimeoutError }>`. Behaviour per [data-model.md § TimeoutVerificationOutcome](data-model.md) and [research.md § R4](research.md#r4--timeout-then-verify-mechanics):
   1. `try { await operation(); return { outcome: 'success' }; }` for the happy path.
   2. In `catch (err)`: if `isObsidianTimeoutError(err)` → call `verify()` inside a try/catch; if verify resolves to `'absent'` return `{ outcome: 'success' }`; if `'present'` return `{ outcome: 'failure', cause: err }`. If `verify()` throws → throw `new OutcomeUndeterminedError(targetPath, err)` (define `OutcomeUndeterminedError` here as a local exported class).
   3. If err is anything else → rethrow unchanged.
   The `targetPath` argument needs to flow in — extend the signature: `attemptWithVerification(targetPath: string, operation, verify)`. Also export the `OutcomeUndeterminedError` class.
-- [ ] T008 [P] Create `src/tools/delete-file/recursive-delete.ts` — export an async function `recursiveDeleteDirectory(rest: ObsidianRestService, dirpath: string, walkState: WalkState): Promise<void>`, a `WalkState` interface, and a `PartialDeleteError` class (extends Error; carries `failedPath: string` and `deletedPaths: string[]`). Behaviour per [research.md § R3](research.md#r3--recursive-walk-algorithm):
+- [X] T008 [P] Create `src/tools/delete-file/recursive-delete.ts` — export an async function `recursiveDeleteDirectory(rest: ObsidianRestService, dirpath: string, walkState: WalkState): Promise<void>`, a `WalkState` interface, and a `PartialDeleteError` class (extends Error; carries `failedPath: string` and `deletedPaths: string[]`). Behaviour per [research.md § R3](research.md#r3--recursive-walk-algorithm):
   1. Define `interface WalkState { deletedPaths: string[]; filesRemoved: number; subdirectoriesRemoved: number; }`. The handler in T009 owns the single mutable instance and reads the counters after the walk returns. Counters are incremented inline as deletions complete — never derived from `deletedPaths` post-hoc (the path strings carry no trailing-slash marker that distinguishes file vs directory; the counters are the source of truth).
   2. List children via `rest.listFilesInDir(dirpath)`. The returned array's order is the iteration order — no in-wrapper sorting (FR-014).
   3. For each child entry in order:
@@ -75,7 +75,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Create `src/tools/delete-file/handler.ts` — export `handleDeleteFile(args: unknown, rest: ObsidianRestService): Promise<CallToolResult>`. The orchestrator per [contracts/delete_file.md](contracts/delete_file.md). Steps:
+- [X] T009 [US1] Create `src/tools/delete-file/handler.ts` — export `handleDeleteFile(args: unknown, rest: ObsidianRestService): Promise<CallToolResult>`. The orchestrator per [contracts/delete_file.md](contracts/delete_file.md). Steps:
   1. Validate input: `const req = assertValidDeleteFileRequest(args);`
   2. Normalise trailing slash: `const target = req.filepath.replace(/\/$/, '');`
   3. Detect file-vs-directory-vs-missing by listing the parent (per [research.md § R2](research.md#r2--how-to-detect-whether-a-path-resolves-to-a-file-or-a-directory)): compute `parent = parentOf(target)`, `name = basename(target)`. If `parent` is empty, call `rest.listFilesInVault()`; otherwise `rest.listFilesInDir(parent)`. If the listing contains `name + '/'` → directory branch. If it contains `name` → file branch. Otherwise → `throw new ObsidianNotFoundError(\`Obsidian API Error 404: not found: ${target}\`);` (so the handler's outer error mapping treats it as not-found).
@@ -96,10 +96,10 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
      - `OutcomeUndeterminedError` → `throw new Error(\`outcome undetermined for ${target}\`);`
      - Any other error → rethrow unchanged (the dispatcher's existing catch will format it as `Error: <message>`).
   Imports needed at the top: `assertValidDeleteFileRequest` from `./schema.js`, `attemptWithVerification, OutcomeUndeterminedError` from `./verify-then-report.js`, `recursiveDeleteDirectory, PartialDeleteError` from `./recursive-delete.js`, and the three error classes from `../../services/obsidian-rest-errors.js`. Also `ObsidianRestService` and `CallToolResult` types.
-- [ ] T010 [P] [US1] Create `src/tools/delete-file/tool.ts` — import `DeleteFileRequestSchema` from `./schema.js`, derive `inputSchema` via `zodToJsonSchema(DeleteFileRequestSchema, { $refStrategy: 'none' })`, and export `DELETE_FILE_TOOLS: Tool[]` containing one entry. The `description` field MUST be the exact wording from [contracts/delete_file.md § Tool description](contracts/delete_file.md#tool-description-advertised-in-mcp-toolslist) — explicitly state recursive directory deletion (FR-011) and timeout coherence (secondary context). The description text *also* delivers the schema-side half of US4 (which is verified by T014's registration test); the README half of US4 is T021. Pattern after [src/tools/patch-content/tool.ts](../../src/tools/patch-content/tool.ts).
-- [ ] T011 [P] [US1] Edit `src/tools/file-tools.ts` — remove the `delete_file` entry (lines 77–94 in the current file, the trailing object in the `FILE_TOOLS` array). The other four entries (`list_files_in_vault`, `list_files_in_dir`, `get_file_contents`, `batch_get_file_contents`) stay untouched. Confirm the array still parses as valid TypeScript and `npm run typecheck` is green afterwards.
-- [ ] T012 [US1] Edit `src/tools/index.ts` — add `import { DELETE_FILE_TOOLS } from './delete-file/tool.js';` near the existing imports, and spread `...DELETE_FILE_TOOLS` into the `ALL_TOOLS` array (place it adjacent to `...FILE_TOOLS` for grouping). Also export `DELETE_FILE_TOOLS` from the `export { ... }` block at the bottom for symmetry with the other tool modules.
-- [ ] T013 [US1] Edit `src/index.ts` — three changes in this single edit:
+- [X] T010 [P] [US1] Create `src/tools/delete-file/tool.ts` — import `DeleteFileRequestSchema` from `./schema.js`, derive `inputSchema` via `zodToJsonSchema(DeleteFileRequestSchema, { $refStrategy: 'none' })`, and export `DELETE_FILE_TOOLS: Tool[]` containing one entry. The `description` field MUST be the exact wording from [contracts/delete_file.md § Tool description](contracts/delete_file.md#tool-description-advertised-in-mcp-toolslist) — explicitly state recursive directory deletion (FR-011) and timeout coherence (secondary context). The description text *also* delivers the schema-side half of US4 (which is verified by T014's registration test); the README half of US4 is T021. Pattern after [src/tools/patch-content/tool.ts](../../src/tools/patch-content/tool.ts).
+- [X] T011 [P] [US1] Edit `src/tools/file-tools.ts` — remove the `delete_file` entry (lines 77–94 in the current file, the trailing object in the `FILE_TOOLS` array). The other four entries (`list_files_in_vault`, `list_files_in_dir`, `get_file_contents`, `batch_get_file_contents`) stay untouched. Confirm the array still parses as valid TypeScript and `npm run typecheck` is green afterwards.
+- [X] T012 [US1] Edit `src/tools/index.ts` — add `import { DELETE_FILE_TOOLS } from './delete-file/tool.js';` near the existing imports, and spread `...DELETE_FILE_TOOLS` into the `ALL_TOOLS` array (place it adjacent to `...FILE_TOOLS` for grouping). Also export `DELETE_FILE_TOOLS` from the `export { ... }` block at the bottom for symmetry with the other tool modules.
+- [X] T013 [US1] Edit `src/index.ts` — three changes in this single edit:
   1. **Add the import** at the top of the file (group with the other handler imports — see lines 30–32 for the existing pattern):
      ```ts
      import { handleDeleteFile } from './tools/delete-file/handler.js';
@@ -115,19 +115,19 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 > **NOTE**: These tests are required by spec FR-001/FR-003/FR-012 and Constitution Principle II. They are NOT optional.
 
-- [ ] T014 [P] [US1] Create `tests/tools/delete-file/registration.test.ts` — assertions:
+- [X] T014 [P] [US1] Create `tests/tools/delete-file/registration.test.ts` — assertions:
   1. `delete_file` appears in `ALL_TOOLS` exactly once. (Catches the "duplicate registration" failure mode if T011 was skipped.)
   2. Its `inputSchema` is the `zod-to-json-schema` derivative of `DeleteFileRequestSchema` (test by re-deriving and deep-comparing — pattern from [tests/tools/patch-content/registration.test.ts](../../tests/tools/patch-content/registration.test.ts)).
   3. The `description` field contains the literal substring `"recursive"` (FR-011 / SC-006 satisfaction).
   4. The `description` also contains the literal substring `"verification"` or `"timeout"` to lock in the secondary timeout-coherence advertising from the contract.
-- [ ] T015 [P] [US1] Create `tests/tools/delete-file/schema.test.ts` — assertions:
+- [X] T015 [P] [US1] Create `tests/tools/delete-file/schema.test.ts` — assertions:
   1. `assertValidDeleteFileRequest({ filepath: 'foo.md' })` returns the typed object unchanged.
   2. `assertValidDeleteFileRequest({ filepath: '  foo.md  ' })` returns `{ filepath: 'foo.md' }` (trim works).
   3. `assertValidDeleteFileRequest({})` throws `ZodError` whose error path includes `filepath`.
   4. `assertValidDeleteFileRequest({ filepath: '' })` throws `ZodError` (the `.min(1)` constraint fires after trim).
   5. `assertValidDeleteFileRequest({ filepath: '   ' })` throws `ZodError` (whitespace-only after trim is empty).
   6. `assertValidDeleteFileRequest({ filepath: 'foo.md', vaultId: 'work' })` returns the typed object with `vaultId` preserved.
-- [ ] T016 [P] [US1] Create `tests/tools/delete-file/single-file.test.ts` — happy-path baseline for the file branch:
+- [X] T016 [P] [US1] Create `tests/tools/delete-file/single-file.test.ts` — happy-path baseline for the file branch:
   1. Use `nock` to mock `GET /vault/parent/` returning `{ files: ['target.md'] }` (parent listing shows the file is present, with no trailing slash).
   2. Mock `DELETE /vault/parent/target.md` returning 200.
   3. Mock `GET /vault/parent/` AGAIN returning `{ files: [] }` for the verification re-query (in case it fires; on a non-timeout-success path it shouldn't, so this mock should be defined as `.optionally()` — confirm none of the subsequent assertions are weakened by this).
@@ -135,7 +135,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
   5. Assert: `result.content[0].text` parses to `{ ok: true, deletedPath: 'parent/target.md', filesRemoved: 0, subdirectoriesRemoved: 0 }`.
   6. Assert: `nock.isDone()` (parent listing + delete were both called).
   7. Pattern after the `nock` setup in [tests/tools/patch-content/handler.test.ts](../../tests/tools/patch-content/handler.test.ts).
-- [ ] T017 [P] [US1] Create `tests/tools/delete-file/recursive.test.ts` — **FR-012 regression test**. Asserts the wrapper iterates contained files in upstream listing order, issues per-item deletes, issues the final outer delete, and reports the consolidated outcome. Three `it(...)` blocks under a single `describe('delete_file recursive non-empty directory', ...)`:
+- [X] T017 [P] [US1] Create `tests/tools/delete-file/recursive.test.ts` — **FR-012 regression test**. Asserts the wrapper iterates contained files in upstream listing order, issues per-item deletes, issues the final outer delete, and reports the consolidated outcome. Three `it(...)` blocks under a single `describe('delete_file recursive non-empty directory', ...)`:
 
   **Block 1 — depth-1 happy path** (the headline FR-012 assertion):
   1. Mock `GET /vault/` (root listing for directory detection on `dir`) returning `{ files: ['dir/'] }` — confirms `dir` is a directory.
@@ -162,7 +162,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
   4. Assert: `nock.isDone()` — every mock matched the URL the handler dispatched, proving the handler stripped the trailing slash before calling the upstream.
 
   The describe-block name MUST include `recursive` and `non-empty` (per quickstart.md test-name convention) so test output identifies the FR-012 regression target.
-- [ ] T018 [P] [US1] Create `tests/tools/delete-file/partial-failure.test.ts` — Q1 + Q4 clarifications regression:
+- [X] T018 [P] [US1] Create `tests/tools/delete-file/partial-failure.test.ts` — Q1 + Q4 clarifications regression:
   1. Mock `GET /vault/dir/` → `{ files: ['fileA.md', 'fileB.md', 'fileC.md'] }`.
   2. Mock `GET /vault/` → `{ files: ['dir/'] }` (directory detection).
   3. Mock the DELETEs: `DELETE /vault/dir/fileA.md` → 200; `DELETE /vault/dir/fileB.md` → 500 with body `{ errorCode: 500, message: 'permission denied' }`. (Use a non-timeout error so verification is NOT triggered — this exercises the per-item delete failure path that goes straight to `PartialDeleteError`.)
@@ -187,7 +187,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 > **NOTE**: These tests are required by spec FR-013 and FR-005/FR-006/FR-009 + the Q3 clarification. They are NOT optional.
 
-- [ ] T019 [P] [US2] Create `tests/tools/delete-file/timeout-verify.test.ts` — **FR-013 + FR-008 regression test**, covers five sub-cases per [contracts/delete_file.md § "Error responses"](contracts/delete_file.md):
+- [X] T019 [P] [US2] Create `tests/tools/delete-file/timeout-verify.test.ts` — **FR-013 + FR-008 regression test**, covers five sub-cases per [contracts/delete_file.md § "Error responses"](contracts/delete_file.md):
 
   **Sub-case A: timeout-with-actual-success** (FR-013 mandate, Q3 clarification negative case):
   1. Mock `GET /vault/` (parent listing for directory detection) → `{ files: ['emptydir/'] }`. Track this interceptor as `directoryDetectionMock`.
@@ -241,7 +241,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T020 [P] [US3] Create `tests/tools/delete-file/not-found.test.ts` — covers four scenarios:
+- [X] T020 [P] [US3] Create `tests/tools/delete-file/not-found.test.ts` — covers four scenarios:
 
   **Scenario A: target absent in parent listing** (the directory-detection path returns "neither file nor directory"):
   1. Mock `GET /vault/parent/` → `{ files: ['unrelated.md'] }` (parent exists; target does not appear).
@@ -280,7 +280,7 @@ The schema-side delivery of US4 is already covered by T010 + T014 (description t
 
 ### Implementation for User Story 4
 
-- [ ] T021 [US4] Edit `README.md` line 257 — replace `| \`delete_file\` | Delete file or directory |` with `| \`delete_file\` | Delete a file or directory. **Directory paths are deleted recursively** — the wrapper removes every contained file and subdirectory before deleting the directory itself, in a single tool call. On a transport timeout the wrapper verifies post-condition via a parent listing before reporting outcome. |`. Confirm the surrounding markdown table still renders correctly (column count, pipe alignment).
+- [X] T021 [US4] Edit `README.md` line 257 — replace `| \`delete_file\` | Delete file or directory |` with `| \`delete_file\` | Delete a file or directory. **Directory paths are deleted recursively** — the wrapper removes every contained file and subdirectory before deleting the directory itself, in a single tool call. On a transport timeout the wrapper verifies post-condition via a parent listing before reporting outcome. |`. Confirm the surrounding markdown table still renders correctly (column count, pipe alignment).
 
 **Checkpoint**: The MCP catalogue description AND the README both advertise recursive deletion. SC-006 holds at both surfaces.
 
@@ -290,10 +290,10 @@ The schema-side delivery of US4 is already covered by T010 + T014 (description t
 
 **Purpose**: Pre-merge quality gates. The constitution requires lint + typecheck + build + test all to pass before merge.
 
-- [ ] T022 Run `npm run lint` — fix any new warnings introduced by Phases 2–6. Zero warnings required (constitution Section 2). Pay particular attention to unused imports in `handler.ts` and the typed-error file.
-- [ ] T023 Run `npm run typecheck` — zero errors required. The new `attemptWithVerification` generic should typecheck cleanly; if `T` is the operation's return type and the verify branch returns `Promise<{outcome:'success'}>` regardless of `T`, double-check the return-type inference.
-- [ ] T024 Run `npm run build` — confirm `tsup` produces a clean bundle with the new `delete-file/` module included.
-- [ ] T025 Run `npm run test` — full suite passes: existing patch-content + surgical-reads + graph tests still green; the seven new delete-file tests all pass.
+- [X] T022 Run `npm run lint` — fix any new warnings introduced by Phases 2–6. Zero warnings required (constitution Section 2). Pay particular attention to unused imports in `handler.ts` and the typed-error file.
+- [X] T023 Run `npm run typecheck` — zero errors required. The new `attemptWithVerification` generic should typecheck cleanly; if `T` is the operation's return type and the verify branch returns `Promise<{outcome:'success'}>` regardless of `T`, double-check the return-type inference.
+- [X] T024 Run `npm run build` — confirm `tsup` produces a clean bundle with the new `delete-file/` module included.
+- [X] T025 Run `npm run test` — full suite passes: existing patch-content + surgical-reads + graph tests still green; the seven new delete-file tests all pass.
 - [ ] T026 [P] Reverse-validation against the bug report: against a real Obsidian vault, run all three reproduction flows from [quickstart.md § 1 "Manual reproduction"](quickstart.md). Assert the "expected" outcomes hold and the "before this fix" outcomes do NOT recur. **DEFER to user — requires a real Obsidian vault.**
 - [ ] T027 [P] PR description includes the constitution one-liner: `Principles I–IV considered.` per Constitution Section 4 / Compliance review. **DEFER to PR-creation time.**
 
