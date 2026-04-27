@@ -11,6 +11,12 @@ This feature is a follow-up correction to [specs/005-fix-directory-delete/spec.m
 
 This spec changes **only** the verification-query mechanism. The response shapes, the abort-on-mid-walk-failure behaviour, and the rest of the spec 005 contract are unchanged.
 
+## Clarifications
+
+### Session 2026-04-27
+
+- Q: What error response shape should the wrapper return when the direct-path verification observes the deleted target is still present (FR-003)? → A: Introduce a new error reason `delete did not take effect: <deletedPath>` carrying the same summary counts (`filesRemoved`, `subdirectoriesRemoved`) as the success response, so callers can reason about partial vault state — which children were already removed before the outer delete failed — without having to re-list the directory.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Recursive delete whose parent becomes empty returns success (Priority: P1)
@@ -65,7 +71,7 @@ Spec 005 FR-008 requires the timeout-then-verify behaviour to apply to per-item 
 - **Multi-level auto-prune cascade**: Same — verification is on the deleted target path, so any depth of cascade above the target is irrelevant.
 - **Sibling-preserving delete (parent retains siblings)**: Same — verification is on the deleted target path, so the wrapper does not need to reason about parent state.
 - **Verification query returns 404**: Positive evidence of success. Wrapper reports the spec 005 structured success response.
-- **Verification query returns 200 (or any non-404 success)**: Positive evidence of failure (target still present). Wrapper reports an error.
+- **Verification query returns 200 (or any non-404 success)**: Positive evidence of failure (target still present). Wrapper reports the `delete did not take effect: <deletedPath>` error with summary counts (`filesRemoved`, `subdirectoriesRemoved`) matching the children that were already successfully removed during the walk.
 - **Verification query times out**: Reported as "outcome undetermined" per spec 005 FR-009.
 - **Verification query returns a non-404 error response (e.g., 500, 502, connection reset)**: Reported as "outcome undetermined" per spec 005 FR-009 — the call did not produce a deterministic absent-vs-present signal.
 - **Path was a file, not a directory, on a transport timeout**: Same direct-path verification applies. A 404 means the file is gone (success); a non-404 success means the file is still present (failure); any other failure of the verification query means undetermined.
@@ -77,7 +83,7 @@ Spec 005 FR-008 requires the timeout-then-verify behaviour to apply to per-item 
 
 - **FR-001**: When the wrapper performs the verification query mandated by spec 005 FR-004 (after a transport timeout on a `delete_file`-issued delete), it MUST query the deleted target's path directly. It MUST NOT use the parent directory's listing as a proxy for the target's existence.
 - **FR-002**: A 404 response (or the upstream's deterministic equivalent for "path absent") on the direct-path verification query MUST be interpreted as positive evidence of successful deletion. The wrapper MUST return the spec 005 structured success response (`ok: true` with `filesRemoved`, `subdirectoriesRemoved`, `deletedPath`) for the directory case, and the equivalent single-file success response for the file case.
-- **FR-003**: A 200 response (or any other non-404 success) on the direct-path verification query MUST be interpreted as positive evidence that the delete did not take effect. The wrapper MUST return an error indicating the target is still present, not a success and not "outcome undetermined".
+- **FR-003**: A 200 response (or any other non-404 success) on the direct-path verification query MUST be interpreted as positive evidence that the delete did not take effect. The wrapper MUST return an error with the reason `delete did not take effect: <deletedPath>` carrying the same summary counts (`filesRemoved`, `subdirectoriesRemoved`) as the spec 005 success response — never a success, never "outcome undetermined", and never the spec 005 `child failed: <path>` shape (which is reserved for mid-walk per-item failures, not post-walk outer-target failures). The counts let callers reason about which children were already successfully removed during the walk before the outer delete failed.
 - **FR-004**: When the direct-path verification query itself fails for any reason that does not yield a deterministic 404-vs-success signal — including its own transport timeout, a connection reset, or a non-404 error response (e.g., 5xx) — the wrapper MUST return the "outcome undetermined" error per spec 005 FR-009. The wrapper MUST NOT retry the verification query (single-shot, consistent with FR-009).
 - **FR-005**: The direct-path verification MUST apply symmetrically to (a) the outer directory delete in a recursive walk, (b) the single-file delete path, and (c) per-item file and subdirectory deletes issued during the recursive walk. This preserves the spec 005 FR-008 symmetry across all `delete_file`-issued deletes.
 - **FR-006**: The success response shape introduced by spec 005 (`filesRemoved`, `subdirectoriesRemoved`, `deletedPath` for the directory case; the single-file equivalent for the file case) MUST be preserved unchanged by this fix. This is a verification-call refactor only, not a response-shape change.
@@ -85,11 +91,12 @@ Spec 005 FR-008 requires the timeout-then-verify behaviour to apply to per-item 
 - **FR-008**: An automated regression test MUST cover the sibling-preserving scenario: a directory `parent/target/` with at least one sibling preserved under `parent/` after the delete, with the upstream mocked to time out the outer delete and return 404 on the direct-path verification query. The test MUST assert the wrapper returns the structured success response.
 - **FR-009**: An automated regression test MUST cover the genuine "outcome undetermined" path: a transport timeout on the outer delete followed by a non-404 error (or its own timeout, or a connection reset) on the direct-path verification query. The test MUST assert the wrapper returns "outcome undetermined" — preserving the spec 005 FR-009 contract.
 - **FR-010**: An automated regression test MUST assert the success response shape is byte-equivalent to the shape pinned by spec 005's tests for the directory case (`filesRemoved`, `subdirectoriesRemoved`, `deletedPath`), guarding against accidental shape regression during the verification refactor.
+- **FR-011**: An automated regression test MUST cover the verified-still-present case: the upstream is mocked to (a) report all per-item child deletes as immediate successes, (b) time out the outer directory delete at the transport layer, and (c) return a 200 (or any non-404 success) on the direct-path verification query for the outer target. The test MUST assert the wrapper returns the `delete did not take effect: <deletedPath>` error with summary counts matching the children that were successfully removed during the walk — never a success, never the spec 005 `child failed: <path>` shape, and never "outcome undetermined".
 
 ### Key Entities
 
 - **Direct-path verification query**: A single-shot query against the deleted target's exact path (not its parent's listing). Returns a deterministic absent-vs-present signal (404 vs. non-404 success) when the upstream is reachable, or a non-deterministic failure (timeout, connection reset, 5xx) otherwise.
-- **Verification outcome**: One of three coherent states — `present` (non-404 success on the direct-path query, surfaced as a delete-failed error), `absent` (404 on the direct-path query, surfaced as the spec 005 structured success response), or `undetermined` (verification call itself failed without a deterministic absent-vs-present signal, surfaced per spec 005 FR-009).
+- **Verification outcome**: One of three coherent states — `present` (non-404 success on the direct-path query, surfaced as the `delete did not take effect: <deletedPath>` error with summary counts mirroring the spec 005 success response), `absent` (404 on the direct-path query, surfaced as the spec 005 structured success response), or `undetermined` (verification call itself failed without a deterministic absent-vs-present signal, surfaced per spec 005 FR-009).
 
 ## Success Criteria *(mandatory)*
 
@@ -101,6 +108,7 @@ Spec 005 FR-008 requires the timeout-then-verify behaviour to apply to per-item 
 - **SC-004**: The success response shape from spec 005 (`filesRemoved`, `subdirectoriesRemoved`, `deletedPath` for the directory case) is unchanged after this fix — verified by a regression test that compares the response JSON to the shape pinned by spec 005's regression tests.
 - **SC-005**: The full regression suite for this fix runs deterministically (no flake) across at least three consecutive runs.
 - **SC-006**: The reproduction recipe from the bug report — create `parent/target/` with files inside under an otherwise-empty `parent/`, call `delete_file` on `parent/target` — returns the structured success response 100% of the time across two consecutive test runs (matching the determinism level at which the bug was originally reproduced on 2026-04-27).
+- **SC-007**: When the outer delete times out at the transport layer and the direct-path verification observes the outer target is still present, the wrapper returns the `delete did not take effect: <deletedPath>` error with summary counts in 100% of such cases — never a success, never the `child failed: <path>` shape, and never "outcome undetermined".
 
 ## Assumptions
 
