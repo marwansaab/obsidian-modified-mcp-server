@@ -74,22 +74,4 @@ export const FILE_TOOLS: Tool[] = [
       required: ['filepaths'],
     },
   },
-  {
-    name: 'delete_file',
-    description: 'Delete a file or directory from the vault.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        filepath: {
-          type: 'string',
-          description: 'Path to the file or directory to delete (relative to vault root).',
-        },
-        vaultId: {
-          type: 'string',
-          description: 'Optional vault ID (defaults to configured default vault).',
-        },
-      },
-      required: ['filepath'],
-    },
-  },
 ];

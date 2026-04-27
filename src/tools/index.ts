@@ -2,6 +2,7 @@
  * Tool registration and exports
  */
 
+import { DELETE_FILE_TOOLS } from './delete-file/tool.js';
 import { FILE_TOOLS } from './file-tools.js';
 import { GRAPH_TOOLS } from './graph/tool.js';
 import { OBSIDIAN_TOOLS } from './obsidian-tools.js';
@@ -18,6 +19,7 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 export const ALL_TOOLS: Tool[] = [
   ...VAULT_TOOLS,
   ...FILE_TOOLS,
+  ...DELETE_FILE_TOOLS,
   ...WRITE_TOOLS,
   ...SEARCH_TOOLS,
   ...PERIODIC_TOOLS,
@@ -30,6 +32,7 @@ export const ALL_TOOLS: Tool[] = [
 export {
   VAULT_TOOLS,
   FILE_TOOLS,
+  DELETE_FILE_TOOLS,
   WRITE_TOOLS,
   SEARCH_TOOLS,
   PERIODIC_TOOLS,
