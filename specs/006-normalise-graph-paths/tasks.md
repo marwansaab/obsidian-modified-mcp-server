@@ -340,7 +340,7 @@ This phase delivers the largest implementation surface of the three user stories
   1. Same mock as Case 1.
   2. Call with `{ filepath: '000-Meta\\Vault Identity.md' }`.
   3. Assert: the captured body's `path` is `'000-Meta/Vault Identity.md'` — the wrapper normalised backslash to forward-slash.
-  4. Assert: response payload returned correctly.
+  4. Assert: identical response payload to Case 1 — same array, same order, same scores. SC-002 mandates that forward-slash and backslash inputs produce identical results for every affected tool, so this comparison is part of the regression-test contract, not an optional tightening.
 
   **Case 3: mixed-separator input → forward-slash on the wire** (FR-005):
   1. Same mock.
@@ -374,8 +374,9 @@ This phase delivers the largest implementation surface of the three user stories
 - [ ] T017 Run `npm run typecheck` — zero errors required. The newly-typed `req` from `assertValidFindSimilarNotesRequest` should narrow correctly through the dispatcher case; the `findSimilar(path, { limit, threshold })` call must satisfy `SmartConnectionsService.findSimilar`'s parameter types.
 - [ ] T018 Run `npm run build` — confirm `tsup` produces a clean bundle that includes `dist/utils/path-normalisation.js` and the modified `dist/tools/semantic-tools.js`.
 - [ ] T019 Run `npm run test` — full suite passes: existing patch-content + surgical-reads + graph + delete-file tests still green; the new path-normalisation, graph regression, and semantic-tools tests all pass. Specifically check that the existing `tests/tools/graph/handler-per-note.test.ts` cases (pre-existing ones, not the new separator regression cases from T008/T010) still pass after the handler edits.
-- [ ] T020 [P] Reverse-validation against the bug report: against a real Obsidian vault on Windows, run all three reproduction flows from [quickstart.md § 1.2](quickstart.md). Assert the "expected (post-fix)" outcomes hold: forward-slash input returns a payload, backslash returns the same payload, the originally-failing reproduction (`get_note_connections` with `filepath: "000-Meta/Vault Identity.md"`) now succeeds. **DEFER to user — requires a real Obsidian vault.**
+- [ ] T020 [P] Reverse-validation against the bug report: against a real Obsidian vault on Windows, run all three reproduction flows from [quickstart.md § 1.2](quickstart.md). Assert the "expected (post-fix)" outcomes hold: forward-slash input returns a payload, backslash returns the same payload, the originally-failing reproduction (`get_note_connections` with `filepath: "000-Meta/Vault Identity.md"`) now succeeds. **POSIX coverage** (SC-004): if POSIX access is available, also run `npm run test` once on macOS or Linux to confirm the helper's `path.sep` abstraction holds on a non-Windows host; otherwise accept the implicit coverage from T006's `path.sep`-aware assertions and the cross-platform-ness of the `replace(/[\\/]/g, ...)` regex. **DEFER to user — Windows half requires a real Obsidian vault; POSIX half requires POSIX access.**
 - [ ] T021 [P] PR description includes the constitution one-liner: `Principles I–IV considered.` per Constitution Section 4 / Compliance review. **DEFER to PR-creation time.**
+- [ ] T022 [P] Edit [README.md](../../README.md) — under the section that lists graph and semantic tools (or wherever path arguments are documented), add a one-line note that all path-taking tools accept either forward-slash or backslash separators uniformly across platforms, matching the rest of the wrapper's surface. Exact placement is the user's call; minimum viable: a small "Path separators" callout near the affected tool tables. Optional but improves Windows-user discoverability of the wrapper's separator-tolerance contract. Not blocking — does not satisfy any FR; addresses S1 from the `/speckit-analyze` report.
 
 ---
 
@@ -388,7 +389,7 @@ This phase delivers the largest implementation surface of the three user stories
 - **Phase 3 (US1)**: Depends on Phase 2. T007 (handler edit) imports from T005 (`toOsNativePath`). T008 (regression test) depends on T007 because the test is written against the post-edit handler behaviour.
 - **Phase 4 (US2)**: Depends on Phase 2 (for `toOsNativePath`). The handler edit T009 is in the *same file* as T007 but in a different function — T009 can be done before, after, or alongside T007. Listed under US2 for traceability. T010 (regression test) depends on T009.
 - **Phase 5 (US3)**: Depends on Phase 2 (for `toForwardSlashPath`). T011 (schema rewrite) is a prerequisite for T012 (dispatcher case imports `assertValidFindSimilarNotesRequest`). T013, T014, T015 depend on T011 + T012 (the tests exercise the wired dispatcher and the new schema).
-- **Phase 6 (Polish)**: Depends on all prior phases. T016–T019 are sequential gate checks. T020 + T021 are deferred to user/PR time.
+- **Phase 6 (Polish)**: Depends on all prior phases. T016–T019 are sequential gate checks. T020, T021, T022 are deferred to user/PR time and have no inter-dependencies (each can be addressed independently).
 
 ### User Story Dependencies
 
@@ -407,7 +408,7 @@ This phase delivers the largest implementation surface of the three user stories
 - **Phase 2**: T005 and T006 — author both files together, run `npm run typecheck && npm run test` after both exist.
 - **Phase 3 vs Phase 4**: US1 and US2 are independent stories. If two developers are available, T007+T008 (US1) and T009+T010 (US2) can run in parallel — same source file, different functions, with care to avoid merge conflicts in `handlers.ts`. Most efficient: one developer applies both T007 and T009 in a single edit, then T008 and T010 run truly in parallel.
 - **Phase 5**: T011 is sequential before T012; T013, T014, T015 are mutually parallel after T012.
-- **Phase 6**: T016 → T017 → T018 → T019 are strictly sequential (each gate depends on its predecessor passing). T020 and T021 can run in parallel with each other.
+- **Phase 6**: T016 → T017 → T018 → T019 are strictly sequential (each gate depends on its predecessor passing). T020, T021, T022 are mutually parallel (different files, different concerns).
 
 ---
 
