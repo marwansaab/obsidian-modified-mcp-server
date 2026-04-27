@@ -69,21 +69,26 @@ type DirectoryListing = string[];   // entries; directories carry a trailing '/'
 
 ---
 
-## RecursiveWalkAccumulator *(internal to recursive-delete.ts)*
+## WalkState *(internal to recursive-delete.ts)*
 
-The mutable list of paths successfully deleted during the recursive walk. Threaded through every recursive call so a partial-failure error captures the full trace.
+The mutable bookkeeping struct threaded through every recursive call. Carries both the trace of successfully-deleted paths AND the running file/subdirectory counters that feed the success response.
 
 ```ts
-type RecursiveWalkAccumulator = string[];   // full vault-relative paths under the target, in deletion order
+interface WalkState {
+  deletedPaths: string[];           // full vault-relative paths under the target, in deletion order
+  filesRemoved: number;             // running count of files deleted during the walk
+  subdirectoriesRemoved: number;    // running count of subdirectories deleted during the walk
+}
 ```
 
 **Rules**:
 
-- Push order matches deletion order. Files are pushed when their per-item delete succeeds; subdirectories are pushed AFTER the subdirectory's recursive walk + final per-subdirectory delete both succeed.
-- The accumulator is owned by the top-level `recursiveDeleteDirectory` invocation; recursive calls share the same array reference.
-- On partial failure the array snapshot is captured into `PartialDeleteError.deletedPaths` via `[...accumulator]` to insulate the error object from any further mutation.
+- Push order on `deletedPaths` matches deletion order. Files are pushed when their per-item delete succeeds; subdirectories are pushed AFTER the subdirectory's recursive walk + final per-subdirectory delete both succeed.
+- Counters are incremented inline at the same point each path is pushed — file deletions bump `filesRemoved`, subdirectory deletions bump `subdirectoriesRemoved`. Counters are NEVER derived post-hoc from `deletedPaths` because the pushed strings do not carry a trailing-slash marker that distinguishes files from directories.
+- The struct is owned by the handler's top-level invocation; recursive calls share the same reference.
+- On partial failure the path-array snapshot is captured into `PartialDeleteError.deletedPaths` via `[...walkState.deletedPaths]` to insulate the error object from any further mutation. The counters are not exposed on the error — they are only consumed by the success response shape.
 
-**Spec coverage**: FR-003 (flat list of every deleted path); the Q1 + Q4 clarifications.
+**Spec coverage**: FR-001 (success counts); FR-003 (flat list of every deleted path); the Q1 + Q4 clarifications.
 
 ---
 
@@ -202,7 +207,7 @@ type TimeoutVerificationOutcome =
 | `DeleteFileRequest` (zod) | FR-010 (trim) | — |
 | `DeleteFileSuccess` | FR-001, SC-001, SC-002, SC-006 | Q2 (success shape: counts) |
 | `DirectoryListing` | FR-010, FR-014 | Q5 (upstream order) |
-| `RecursiveWalkAccumulator` | FR-003 | Q1, Q4 (flat full inventory) |
+| `WalkState` | FR-001, FR-003 | Q1, Q4 (flat full inventory) |
 | `PartialDeleteError` | FR-003, Story 1 AS-3 | Q1, Q4 |
 | `OutcomeUndeterminedError` | FR-009, SC-004 | Q3 (single-shot, no retry) |
 | `ObsidianNotFoundError` | FR-007, SC-003 | — |

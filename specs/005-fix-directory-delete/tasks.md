@@ -54,12 +54,13 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
   2. In `catch (err)`: if `isObsidianTimeoutError(err)` → call `verify()` inside a try/catch; if verify resolves to `'absent'` return `{ outcome: 'success' }`; if `'present'` return `{ outcome: 'failure', cause: err }`. If `verify()` throws → throw `new OutcomeUndeterminedError(targetPath, err)` (define `OutcomeUndeterminedError` here as a local exported class).
   3. If err is anything else → rethrow unchanged.
   The `targetPath` argument needs to flow in — extend the signature: `attemptWithVerification(targetPath: string, operation, verify)`. Also export the `OutcomeUndeterminedError` class.
-- [ ] T008 [P] Create `src/tools/delete-file/recursive-delete.ts` — export an async function `recursiveDeleteDirectory(rest: ObsidianRestService, dirpath: string, deletedAcc: string[]): Promise<void>` and a `PartialDeleteError` class (extends Error; carries `failedPath: string` and `deletedPaths: string[]`). Behaviour per [research.md § R3](research.md#r3--recursive-walk-algorithm):
-  1. List children via `rest.listFilesInDir(dirpath)`. The returned array's order is the iteration order — no in-wrapper sorting (FR-014).
-  2. For each child entry in order:
-     - If the entry ends with `'/'` → compute `childDir = joinPath(dirpath, child.replace(/\/$/, ''))` and call `recursiveDeleteDirectory(rest, childDir, deletedAcc)`. After it returns, call `attemptWithVerification(childDir, () => rest.deleteFile(childDir), () => listingHasName(rest, parentOf(childDir), basename(childDir)) ? 'present' : 'absent')`. On `{outcome:'success'}` push `childDir` onto `deletedAcc`. On `{outcome:'failure'}` throw `new PartialDeleteError(childDir, [...deletedAcc])`.
-     - Otherwise → compute `childFile = joinPath(dirpath, child)` and call `attemptWithVerification(childFile, () => rest.deleteFile(childFile), () => listingHasName(rest, dirpath, child) ? 'present' : 'absent')`. On success push `childFile`; on failure throw `new PartialDeleteError(childFile, [...deletedAcc])`.
-  3. After all children succeed, return — the *outer* directory delete is the caller's (handler's) responsibility, not this function's.
+- [ ] T008 [P] Create `src/tools/delete-file/recursive-delete.ts` — export an async function `recursiveDeleteDirectory(rest: ObsidianRestService, dirpath: string, walkState: WalkState): Promise<void>`, a `WalkState` interface, and a `PartialDeleteError` class (extends Error; carries `failedPath: string` and `deletedPaths: string[]`). Behaviour per [research.md § R3](research.md#r3--recursive-walk-algorithm):
+  1. Define `interface WalkState { deletedPaths: string[]; filesRemoved: number; subdirectoriesRemoved: number; }`. The handler in T009 owns the single mutable instance and reads the counters after the walk returns. Counters are incremented inline as deletions complete — never derived from `deletedPaths` post-hoc (the path strings carry no trailing-slash marker that distinguishes file vs directory; the counters are the source of truth).
+  2. List children via `rest.listFilesInDir(dirpath)`. The returned array's order is the iteration order — no in-wrapper sorting (FR-014).
+  3. For each child entry in order:
+     - If the entry ends with `'/'` → compute `childDir = joinPath(dirpath, child.replace(/\/$/, ''))` and call `recursiveDeleteDirectory(rest, childDir, walkState)`. After it returns, call `attemptWithVerification(childDir, () => rest.deleteFile(childDir), () => listingHasName(rest, parentOf(childDir), basename(childDir)) ? 'present' : 'absent')`. On `{outcome:'success'}` push `childDir` onto `walkState.deletedPaths` AND increment `walkState.subdirectoriesRemoved`. On `{outcome:'failure'}` throw `new PartialDeleteError(childDir, [...walkState.deletedPaths])`.
+     - Otherwise → compute `childFile = joinPath(dirpath, child)` and call `attemptWithVerification(childFile, () => rest.deleteFile(childFile), () => listingHasName(rest, dirpath, child) ? 'present' : 'absent')`. On success push `childFile` AND increment `walkState.filesRemoved`. On failure throw `new PartialDeleteError(childFile, [...walkState.deletedPaths])`.
+  4. After all children succeed, return — the *outer* directory delete is the caller's (handler's) responsibility, not this function's.
   Include small helpers `joinPath`, `parentOf`, `basename`, and `listingHasName(rest, parentDir, name)` (returns `'present' | 'absent'` based on whether `parentDir`'s listing contains `name` or `name + '/'`). For the root case (empty `parentDir`), use `rest.listFilesInVault()` instead of `rest.listFilesInDir(parentDir)`.
 
 **Checkpoint**: `npm run typecheck` passes. `obsidian-rest.ts` throws typed errors (existing tests still green). The three new modules under `src/tools/delete-file/` are ready to be composed by the handler in Phase 3.
@@ -79,11 +80,11 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
   2. Normalise trailing slash: `const target = req.filepath.replace(/\/$/, '');`
   3. Detect file-vs-directory-vs-missing by listing the parent (per [research.md § R2](research.md#r2--how-to-detect-whether-a-path-resolves-to-a-file-or-a-directory)): compute `parent = parentOf(target)`, `name = basename(target)`. If `parent` is empty, call `rest.listFilesInVault()`; otherwise `rest.listFilesInDir(parent)`. If the listing contains `name + '/'` → directory branch. If it contains `name` → file branch. Otherwise → `throw new ObsidianNotFoundError(\`Obsidian API Error 404: not found: ${target}\`);` (so the handler's outer error mapping treats it as not-found).
   4. **Directory branch** (recursive):
-     a. Initialise `const deletedAcc: string[] = []`. Initialise `let filesRemoved = 0; let subdirectoriesRemoved = 0;` — count by walking `deletedAcc` after Step c (entries ending with `/` are subdirectories; others are files). Or count incrementally inside the recursive walk by passing counters through; either is acceptable. Pick whichever keeps `recursive-delete.ts` simpler.
-     b. Call `await recursiveDeleteDirectory(rest, target, deletedAcc);`. Any `PartialDeleteError` thrown propagates to the handler's outer catch.
-     c. Compute counts from `deletedAcc` (split by trailing-slash convention, OR pass counters through — see step a).
+     a. Initialise `const walkState: WalkState = { deletedPaths: [], filesRemoved: 0, subdirectoriesRemoved: 0 };`. The walk maintains counters inline (see T008 step 1) — do NOT attempt to derive `filesRemoved` / `subdirectoriesRemoved` from `walkState.deletedPaths` after the fact, because the pushed paths do not carry a trailing-slash marker.
+     b. Call `await recursiveDeleteDirectory(rest, target, walkState);`. Any `PartialDeleteError` thrown propagates to the handler's outer catch.
+     c. Read `walkState.filesRemoved` and `walkState.subdirectoriesRemoved` directly — they are already the correct totals.
      d. Issue the final outer-directory delete via `attemptWithVerification(target, () => rest.deleteFile(target), () => listingHasName(rest, parent, name) ? 'present' : 'absent')`. On `{outcome:'success'}` continue; on `{outcome:'failure'}` throw a partial-failure-style error naming the outer directory; `OutcomeUndeterminedError` propagates as-is.
-     e. Return `{ content: [{ type: 'text', text: JSON.stringify({ ok: true, deletedPath: target, filesRemoved, subdirectoriesRemoved }) }] }`.
+     e. Return `{ content: [{ type: 'text', text: JSON.stringify({ ok: true, deletedPath: target, filesRemoved: walkState.filesRemoved, subdirectoriesRemoved: walkState.subdirectoriesRemoved }) }] }`.
   5. **File branch** (single delete):
      a. Call `attemptWithVerification(target, () => rest.deleteFile(target), () => listingHasName(rest, parent, name) ? 'present' : 'absent')`.
      b. On success return `{ content: [{ type: 'text', text: JSON.stringify({ ok: true, deletedPath: target, filesRemoved: 0, subdirectoriesRemoved: 0 }) }] }`.
@@ -134,22 +135,40 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
   5. Assert: `result.content[0].text` parses to `{ ok: true, deletedPath: 'parent/target.md', filesRemoved: 0, subdirectoriesRemoved: 0 }`.
   6. Assert: `nock.isDone()` (parent listing + delete were both called).
   7. Pattern after the `nock` setup in [tests/tools/patch-content/handler.test.ts](../../tests/tools/patch-content/handler.test.ts).
-- [ ] T017 [P] [US1] Create `tests/tools/delete-file/recursive.test.ts` — **FR-012 regression test**. Asserts the wrapper iterates contained files in upstream listing order, issues per-item deletes, issues the final outer delete, and reports the consolidated outcome:
-  1. Mock `GET /vault/dir/` returning `{ files: ['fileA.md', 'sub/', 'fileB.md'] }` — three children in this exact order, with one nested subdirectory in the middle.
-  2. Mock `GET /vault/dir/sub/` returning `{ files: ['inner.md'] }` (one nested file).
-  3. Mock `GET /vault/` (root listing for directory detection on `dir`) returning `{ files: ['dir/'] }` — confirms `dir` is a directory.
-  4. Mock the four DELETE endpoints in the order they should be called: `DELETE /vault/dir/fileA.md` → 200, `DELETE /vault/dir/sub/inner.md` → 200, `DELETE /vault/dir/sub` → 200, `DELETE /vault/dir/fileB.md` → 200, `DELETE /vault/dir` → 200. The per-item verification listing queries don't fire on a non-timeout success path — but if the implementation uses lazy verification (only on timeout), no extra listing mocks are needed beyond what's already set up.
+- [ ] T017 [P] [US1] Create `tests/tools/delete-file/recursive.test.ts` — **FR-012 regression test**. Asserts the wrapper iterates contained files in upstream listing order, issues per-item deletes, issues the final outer delete, and reports the consolidated outcome. Three `it(...)` blocks under a single `describe('delete_file recursive non-empty directory', ...)`:
+
+  **Block 1 — depth-1 happy path** (the headline FR-012 assertion):
+  1. Mock `GET /vault/` (root listing for directory detection on `dir`) returning `{ files: ['dir/'] }` — confirms `dir` is a directory.
+  2. Mock `GET /vault/dir/` returning `{ files: ['fileA.md', 'sub/', 'fileB.md'] }` — three children in this exact order, with one nested subdirectory in the middle.
+  3. Mock `GET /vault/dir/sub/` returning `{ files: ['inner.md'] }` (one nested file).
+  4. Mock the five DELETE endpoints in the exact order they MUST be called: `DELETE /vault/dir/fileA.md` → 200; `DELETE /vault/dir/sub/inner.md` → 200; `DELETE /vault/dir/sub` → 200; `DELETE /vault/dir/fileB.md` → 200; `DELETE /vault/dir` → 200. NO verification mocks are needed because no upstream call is configured to time out in this test — `attemptWithVerification` only fires `verify()` on `ObsidianTimeoutError`.
   5. Call `await server.handleToolCall('delete_file', { filepath: 'dir' })`.
   6. Assert: `result.content[0].text` parses to `{ ok: true, deletedPath: 'dir', filesRemoved: 3, subdirectoriesRemoved: 1 }` (3 files = fileA + inner + fileB; 1 subdirectory = sub).
-  7. Assert: `nock.isDone()` AND the DELETE calls happened in the order pinned in step 4 (use `nock.recorder` or assert the call sequence by recording handler-side via a side-effect spy if needed — alternatively, define each DELETE mock with `.onCall(...)` semantics; nock by default fires mocks in registration order).
-  8. The test's name MUST include `recursive` and `non-empty` (per quickstart.md test-name convention) so test output identifies the FR-012 regression target.
+  7. Assert: `nock.isDone()` — every mock was consumed exactly once. **Mock-ordering strategy**: rely on nock's URL-match-on-registration-order semantics (each DELETE has a unique URL, so consumption order naturally pins the call sequence; if the handler issued them out of order, a later interceptor's URL would not match first and `nock.isDone()` would report a pending mock). Do NOT use `nock.recorder` or side-effect spies — the URL-uniqueness invariant is sufficient and less fragile.
+
+  **Block 2 — depth-2 nested directory** (Edge case "Recursion depth"):
+  1. Mock `GET /vault/` → `{ files: ['outer/'] }`.
+  2. Mock `GET /vault/outer/` → `{ files: ['mid/'] }`.
+  3. Mock `GET /vault/outer/mid/` → `{ files: ['leaf.md'] }`.
+  4. Mock the DELETEs in order: `DELETE /vault/outer/mid/leaf.md` → 200; `DELETE /vault/outer/mid` → 200; `DELETE /vault/outer` → 200.
+  5. Call `await server.handleToolCall('delete_file', { filepath: 'outer' })`.
+  6. Assert: `{ ok: true, deletedPath: 'outer', filesRemoved: 1, subdirectoriesRemoved: 1 }`. Confirms recursion descends arbitrarily deep and the counters match path-by-path bookkeeping.
+  7. Assert: `nock.isDone()`.
+
+  **Block 3 — trailing-slash equivalence** (FR-010 lock-in — `foo/` and `foo` are the same target):
+  1. Same mocks as Block 1 (re-registered via `beforeEach` or duplicated — depending on test-file structure; nock interceptors are per-test).
+  2. Call `await server.handleToolCall('delete_file', { filepath: 'dir/' })` — note the trailing slash.
+  3. Assert: identical outcome to Block 1 — `{ ok: true, deletedPath: 'dir', filesRemoved: 3, subdirectoriesRemoved: 1 }`. The `deletedPath` MUST be `'dir'` (without trailing slash) — the handler normalises before reporting.
+  4. Assert: `nock.isDone()` — every mock matched the URL the handler dispatched, proving the handler stripped the trailing slash before calling the upstream.
+
+  The describe-block name MUST include `recursive` and `non-empty` (per quickstart.md test-name convention) so test output identifies the FR-012 regression target.
 - [ ] T018 [P] [US1] Create `tests/tools/delete-file/partial-failure.test.ts` — Q1 + Q4 clarifications regression:
   1. Mock `GET /vault/dir/` → `{ files: ['fileA.md', 'fileB.md', 'fileC.md'] }`.
   2. Mock `GET /vault/` → `{ files: ['dir/'] }` (directory detection).
   3. Mock the DELETEs: `DELETE /vault/dir/fileA.md` → 200; `DELETE /vault/dir/fileB.md` → 500 with body `{ errorCode: 500, message: 'permission denied' }`. (Use a non-timeout error so verification is NOT triggered — this exercises the per-item delete failure path that goes straight to `PartialDeleteError`.)
   4. Call `await server.handleToolCall('delete_file', { filepath: 'dir' })`.
   5. Assert: `result.isError === true`.
-  6. Assert: `result.content[0].text` is exactly `Error: child failed: dir/fileB.md — already deleted: [dir/fileA.md]`.
+  6. Assert: `result.content[0].text` is exactly `Error: child failed: dir/fileB.md — already deleted: [dir/fileA.md]`. **Note on punctuation**: the separator between `<failedPath>` and `already deleted: [...]` is the em-dash `U+2014` (`—`), NOT an ASCII hyphen-minus. The exact character MUST be copy-pasted from [contracts/delete_file.md § 3 Partial failure during recursive walk](contracts/delete_file.md) into both the handler's error-formatting code (T009 step 6) AND this test assertion. To prevent encoding drift, the handler SHOULD export the format as a single helper (e.g., `formatPartialFailureError(failedPath, deletedPaths)`) so the contract, handler, and test all reference one source of truth for the punctuation.
   7. Assert: NO `DELETE /vault/dir/fileC.md` call was made (the walk aborted on fileB; fileC is never touched).
   8. Assert: NO `DELETE /vault/dir` call was made (the outer delete is gated on the walk succeeding).
   9. Assert: `nock.pendingMocks()` does NOT include `/vault/dir/fileC.md` or `/vault/dir` (proves they were registered and unused — alternatively just don't register them and assert they were never called via `nock.isDone()` semantics).
@@ -168,15 +187,16 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 > **NOTE**: These tests are required by spec FR-013 and FR-005/FR-006/FR-009 + the Q3 clarification. They are NOT optional.
 
-- [ ] T019 [P] [US2] Create `tests/tools/delete-file/timeout-verify.test.ts` — **FR-013 regression test**, covers three sub-cases per [contracts/delete_file.md § "Error responses"](contracts/delete_file.md):
+- [ ] T019 [P] [US2] Create `tests/tools/delete-file/timeout-verify.test.ts` — **FR-013 + FR-008 regression test**, covers five sub-cases per [contracts/delete_file.md § "Error responses"](contracts/delete_file.md):
 
   **Sub-case A: timeout-with-actual-success** (FR-013 mandate, Q3 clarification negative case):
-  1. Mock `GET /vault/` (parent listing for directory detection) → `{ files: ['emptydir/'] }`.
+  1. Mock `GET /vault/` (parent listing for directory detection) → `{ files: ['emptydir/'] }`. Track this interceptor as `directoryDetectionMock`.
   2. Mock `GET /vault/emptydir/` → `{ files: [] }` (the directory is empty — recursive walk has no children to delete).
   3. Mock the outer `DELETE /vault/emptydir` → `nock(...).delete(...).replyWithError({ code: 'ECONNABORTED', message: 'timeout of 10000ms exceeded' });` (synthesises an axios timeout deterministically per [research.md § R6](research.md#r6--test-fixtures-simulating-timeouts-deterministically)).
-  4. Mock the verification re-query `GET /vault/` → `{ files: [] }` (directory is gone — upstream actually completed the delete).
+  4. Mock the verification re-query `GET /vault/` → `{ files: [] }` (directory is gone — upstream actually completed the delete). Track this interceptor as `verificationMock`. Wrap in a counter so the test can assert how many times the verification listing was actually consumed.
   5. Call `await server.handleToolCall('delete_file', { filepath: 'emptydir' })`.
   6. Assert: `result.isError` is falsy. `result.content[0].text` parses to `{ ok: true, deletedPath: 'emptydir', filesRemoved: 0, subdirectoriesRemoved: 0 }`. **The raw `Error: Obsidian API Error -1: timeout` text MUST NOT appear anywhere in the response** — this is the SC-002 / SC-005 lock-in.
+  7. Assert (SC-004 lock-in — "exactly one verification listing query per timeout"): exactly TWO `GET /vault/` calls were made — one for the initial directory detection, one for the post-timeout verification. No more, no less. Implement by either: (a) using `nock`'s `.on('request', ...)` event with a path-matching counter, or (b) registering each `GET /vault/` mock individually (no `.persist()`) and checking `nock.pendingMocks().length === 0` AND that no extra interceptor was registered. The handler MUST NOT retry the verification query (FR-009 / Q3).
 
   **Sub-case B: timeout-with-actual-failure** (FR-006 inverse):
   1. Same `GET /vault/`, `GET /vault/emptydir/`, and timeout `DELETE /vault/emptydir` as sub-case A.
@@ -196,9 +216,20 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
   3. Call the dispatcher.
   4. Assert: identical to sub-case C — `result.isError === true`, text is `Error: outcome undetermined for emptydir`. The handler MUST treat verification timeout and verification 5xx identically.
 
-  All four sub-cases live in the same test file as separate `it(...)` blocks under one `describe('delete_file timeout-then-verify', ...)`.
+  **Sub-case E: per-item-delete timeout-then-verify** (FR-008 lock-in — the timeout-then-verify behaviour applies to per-item deletes inside the recursive walk, not just the outer call):
+  1. Mock `GET /vault/` → `{ files: ['dir/'] }` (directory detection — `dir` is a directory).
+  2. Mock `GET /vault/dir/` → `{ files: ['fileA.md', 'fileB.md'] }` (two children).
+  3. Mock the FIRST per-item delete: `DELETE /vault/dir/fileA.md` → `replyWithError({ code: 'ECONNABORTED', message: 'timeout of 10000ms exceeded' });` (per-item timeout — the failure mode FR-008 targets).
+  4. Mock the per-item verification re-query: `GET /vault/dir/` → `{ files: ['fileB.md'] }` (the listing now shows fileA.md is absent — upstream actually completed the per-item delete despite the wire timeout).
+  5. Mock the SECOND per-item delete: `DELETE /vault/dir/fileB.md` → 200.
+  6. Mock the outer delete: `DELETE /vault/dir` → 200.
+  7. Call `await server.handleToolCall('delete_file', { filepath: 'dir' })`.
+  8. Assert: `result.isError` is falsy. `result.content[0].text` parses to `{ ok: true, deletedPath: 'dir', filesRemoved: 2, subdirectoriesRemoved: 0 }`. The walk must NOT have aborted on the timeout — it must have observed via verification that fileA.md was actually deleted, then continued to fileB.md.
+  9. Assert: `nock.isDone()` (every mock was consumed — proves the per-item verify query fired exactly once for the timed-out child, the walk continued, and both fileB.md and the outer dir were deleted afterward).
 
-**Checkpoint**: Sub-cases A through D all pass. The timeout coherence half of the contract is regression-locked. Together with Phase 3's recursive tests, the FR-012 + FR-013 mandate is satisfied.
+  All five sub-cases live in the same test file as separate `it(...)` blocks under one `describe('delete_file timeout-then-verify', ...)`.
+
+**Checkpoint**: Sub-cases A through E all pass. The timeout coherence half of the contract is regression-locked at both the outer-call layer (A–D) and the per-item layer inside the recursive walk (E). Together with Phase 3's recursive tests, the FR-008 + FR-012 + FR-013 mandate is satisfied.
 
 ---
 
@@ -210,7 +241,7 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T020 [P] [US3] Create `tests/tools/delete-file/not-found.test.ts` — covers two scenarios:
+- [ ] T020 [P] [US3] Create `tests/tools/delete-file/not-found.test.ts` — covers four scenarios:
 
   **Scenario A: target absent in parent listing** (the directory-detection path returns "neither file nor directory"):
   1. Mock `GET /vault/parent/` → `{ files: ['unrelated.md'] }` (parent exists; target does not appear).
@@ -218,10 +249,10 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
   3. Assert: `result.isError === true`. Text is exactly `Error: not found: parent/missing.md`.
   4. Assert: NO DELETE call was issued upstream (the handler bailed before any delete).
 
-  **Scenario B: target previously existed but already deleted** (calling `delete_file` twice):
-  1. Mock `GET /vault/` → `{ files: [] }` (root is empty — the file was already deleted).
+  **Scenario B: post-deletion state — target absent at root** (covers User Story 3 Acceptance Scenario 2: "a path that previously existed but has already been deleted"). The test does NOT issue two calls; it simulates the post-deletion vault state and asserts the second-call outcome:
+  1. Mock `GET /vault/` → `{ files: [] }` (root is empty — the file was deleted before this call ran).
   2. Call `await server.handleToolCall('delete_file', { filepath: 'gone.md' })`.
-  3. Assert: identical to Scenario A — `Error: not found: gone.md`.
+  3. Assert: identical to Scenario A — `result.isError === true`, text is `Error: not found: gone.md`. No DELETE call was issued. SC-003 is locked in even when the upstream listing has changed shape since the path was last observed.
 
   **Scenario C: upstream returns 404 directly** (defence in depth — even if the parent listing accidentally includes the name due to caching / race, a 404 from the DELETE itself should still surface as "not found"):
   1. Mock `GET /vault/parent/` → `{ files: ['ghost.md'] }` (parent listing thinks it's there).
@@ -229,7 +260,13 @@ Single TypeScript project — `src/` and `tests/` at repo root. New code lives u
   3. Call the dispatcher.
   4. Assert: `result.isError === true`. Text is `Error: not found: parent/ghost.md` (the typed-error layer's `ObsidianNotFoundError` passthrough — never the raw upstream text "Obsidian API Error 404").
 
-**Checkpoint**: All three not-found scenarios pass. SC-003 (zero transport-timeout errors for missing paths) is regression-locked.
+  **Scenario D: parent itself does not exist** (the parent-listing call returns 404 before directory detection can even run — covers the case where the user supplies a path under a non-existent parent directory like `delete_file({ filepath: 'no-such-dir/file.md' })`):
+  1. Mock `GET /vault/no-such-dir/` → `reply(404, { errorCode: 404, message: 'directory not found' });` (the parent listing itself fails — the typed-error layer maps this to `ObsidianNotFoundError`).
+  2. Call `await server.handleToolCall('delete_file', { filepath: 'no-such-dir/file.md' })`.
+  3. Assert: `result.isError === true`. Text is `Error: not found: no-such-dir/file.md` — the message uses the **input target** verbatim, NOT the parent path. The handler's error mapping (T009 step 6) converts any `ObsidianNotFoundError` into `not found: ${target}` where `target` is the trimmed-and-trailing-slash-normalised input — irrespective of which upstream path actually returned 404.
+  4. Assert: NO DELETE call was issued upstream.
+
+**Checkpoint**: All four not-found scenarios pass. SC-003 (zero transport-timeout errors for missing paths) is regression-locked, and the contract's "not found error always names the input target" invariant is locked in regardless of which upstream layer returns the 404.
 
 ---
 
