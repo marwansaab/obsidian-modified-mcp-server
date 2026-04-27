@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
-Active feature plan: [specs/004-fix-graph-tools/plan.md](specs/004-fix-graph-tools/plan.md)
+Active feature plan: [specs/005-fix-directory-delete/plan.md](specs/005-fix-directory-delete/plan.md)
 
 For technologies, project structure, validator rules, contracts, and
 test matrices on the current feature, read the plan above and its
