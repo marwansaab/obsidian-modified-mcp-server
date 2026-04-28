@@ -17,14 +17,10 @@ describe('delete_file tool registration', () => {
     expect(entry?.inputSchema).toEqual(expected);
   });
 
-  it('description contains "recursive" (FR-011 / SC-006)', () => {
-    const entry = ALL_TOOLS.find((t) => t.name === 'delete_file');
-    expect(entry?.description).toMatch(/recursive/);
-  });
-
-  it('description advertises timeout coherence (verification or timeout)', () => {
+  it('description advertises both the recursive contract (spec 005 FR-011) and the direct-path verification mechanism (spec 007 FR-012)', () => {
     const entry = ALL_TOOLS.find((t) => t.name === 'delete_file');
     const description = entry?.description ?? '';
-    expect(description).toMatch(/verification|timeout/);
+    expect(description).toContain('When the path refers to a directory, the deletion is recursive');
+    expect(description).toContain('single direct-path verification query');
   });
 });
