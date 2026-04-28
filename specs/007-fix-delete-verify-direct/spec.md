@@ -35,7 +35,7 @@ A caller invokes `delete_file` on a non-empty directory whose parent contains on
 
 ---
 
-### User Story 2 - "Outcome undetermined" still fires for genuine verification-call failures (Priority: P1)
+### User Story 2 - "Outcome undetermined" narrows but still fires for genuine verification-call failures, and verified-still-present surfaces a new error (Priority: P1)
 
 The "outcome undetermined" path from spec 005 FR-009 remains the correct response when the verification call itself cannot produce a deterministic absent-vs-present signal for the deleted path — for example, the verification call hits a connection reset, a non-404 5xx error, or its own transport timeout. After this fix, "outcome undetermined" continues to fire for those genuine cases, but no longer fires for the auto-prune scenario in Story 1.
 
@@ -50,7 +50,7 @@ The "outcome undetermined" path from spec 005 FR-009 remains the correct respons
 
 ---
 
-### User Story 3 - Single-file delete benefits from the same direct-path verification (Priority: P2)
+### User Story 3 - Single-file delete and per-item walk apply the same direct-path verification (Priority: P2)
 
 Spec 005 FR-008 requires the timeout-then-verify behaviour to apply to per-item file and subdirectory deletes during the recursive walk as well as the outer directory delete. This story ensures that requirement is preserved: the new direct-path verification mechanism applies symmetrically to single-file deletes and to per-item deletes inside the recursive walk, not just to the outer directory delete.
 
@@ -92,6 +92,7 @@ Spec 005 FR-008 requires the timeout-then-verify behaviour to apply to per-item 
 - **FR-009**: An automated regression test MUST cover the genuine "outcome undetermined" path: a transport timeout on the outer delete followed by a non-404 error (or its own timeout, or a connection reset) on the direct-path verification query. The test MUST assert the wrapper returns "outcome undetermined" — preserving the spec 005 FR-009 contract.
 - **FR-010**: An automated regression test MUST assert the success response shape is byte-equivalent to the shape pinned by spec 005's tests for the directory case (`filesRemoved`, `subdirectoriesRemoved`, `deletedPath`), guarding against accidental shape regression during the verification refactor.
 - **FR-011**: An automated regression test MUST cover the verified-still-present case: the upstream is mocked to (a) report all per-item child deletes as immediate successes, (b) time out the outer directory delete at the transport layer, and (c) return a 200 (or any non-404 success) on the direct-path verification query for the outer target. The test MUST assert the wrapper returns the `delete did not take effect: <deletedPath>` error with summary counts matching the children that were successfully removed during the walk — never a success, never the spec 005 `child failed: <path>` shape, and never "outcome undetermined".
+- **FR-012**: The wrapper's `delete_file` tool description (advertised in the MCP `tools/list` response) MUST advertise the direct-path verification mechanism via the phrase "single direct-path verification query" (or semantically equivalent wording that names the direct-path approach), so an LLM consumer can reason about why a `delete did not take effect` response is meaningful (the wrapper actually checked the deleted path) without having to invoke the tool. The recursive-contract sentence introduced by spec 005 FR-011 ("When the path refers to a directory, the deletion is recursive...") MUST also remain in the description, unchanged. An automated registration test MUST assert both phrases are present.
 
 ### Key Entities
 
@@ -107,7 +108,7 @@ Spec 005 FR-008 requires the timeout-then-verify behaviour to apply to per-item 
 - **SC-003**: Across the full automated regression suite for this feature, zero "outcome undetermined" responses are returned for cases where the deleted target is verifiably absent on the vault. The "outcome undetermined" code path fires only when the verification call itself produced no deterministic absent-vs-present signal.
 - **SC-004**: The success response shape from spec 005 (`filesRemoved`, `subdirectoriesRemoved`, `deletedPath` for the directory case) is unchanged after this fix — verified by a regression test that compares the response JSON to the shape pinned by spec 005's regression tests.
 - **SC-005**: The full regression suite for this fix runs deterministically (no flake) across at least three consecutive runs.
-- **SC-006**: The reproduction recipe from the bug report — create `parent/target/` with files inside under an otherwise-empty `parent/`, call `delete_file` on `parent/target` — returns the structured success response 100% of the time across two consecutive test runs (matching the determinism level at which the bug was originally reproduced on 2026-04-27).
+- **SC-006**: The reproduction recipe from the bug report — create `parent/target/` with files inside under an otherwise-empty `parent/`, call `delete_file` on `parent/target` — returns the structured success response 100% of the time across two consecutive test runs (matching the determinism level at which the bug was originally reproduced on 2026-04-27). SC-005's three-run automated determinism check supersedes this two-run target.
 - **SC-007**: When the outer delete times out at the transport layer and the direct-path verification observes the outer target is still present, the wrapper returns the `delete did not take effect: <deletedPath>` error with summary counts in 100% of such cases — never a success, never the `child failed: <path>` shape, and never "outcome undetermined".
 
 ## Assumptions
