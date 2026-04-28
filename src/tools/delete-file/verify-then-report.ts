@@ -14,8 +14,10 @@
 
 import {
   ObsidianTimeoutError,
+  isObsidianNotFoundError,
   isObsidianTimeoutError,
 } from '../../services/obsidian-rest-errors.js';
+import { ObsidianRestService } from '../../services/obsidian-rest.js';
 
 export class OutcomeUndeterminedError extends Error {
   constructor(public readonly targetPath: string, public readonly cause?: unknown) {
@@ -24,9 +26,48 @@ export class OutcomeUndeterminedError extends Error {
   }
 }
 
+export class DeleteDidNotTakeEffectError extends Error {
+  constructor(
+    public readonly targetPath: string,
+    public readonly filesRemoved: number,
+    public readonly subdirectoriesRemoved: number
+  ) {
+    super(
+      `delete did not take effect: ${targetPath} ` +
+        `(filesRemoved=${filesRemoved}, subdirectoriesRemoved=${subdirectoriesRemoved})`
+    );
+    this.name = 'DeleteDidNotTakeEffectError';
+  }
+}
+
 export type TimeoutVerificationOutcome =
   | { outcome: 'success' }
   | { outcome: 'failure'; cause: ObsidianTimeoutError };
+
+// Direct-path probe for a deleted target: queries the path itself and
+// translates the upstream's response into an absent/present signal.
+// 404 (ObsidianNotFoundError) → 'absent' (positive evidence of success).
+// 2xx success → 'present' (positive evidence the delete did not take effect).
+// Any other failure (timeout, connection reset, 5xx) is rethrown so the
+// caller (attemptWithVerification) can convert it to OutcomeUndeterminedError
+// per spec 005 FR-009 / spec 007 FR-004.
+export async function pathExists(
+  rest: ObsidianRestService,
+  path: string,
+  kind: 'file' | 'directory'
+): Promise<'absent' | 'present'> {
+  try {
+    if (kind === 'directory') {
+      await rest.listFilesInDir(path);
+    } else {
+      await rest.getFileContents(path);
+    }
+    return 'present';
+  } catch (err) {
+    if (isObsidianNotFoundError(err)) return 'absent';
+    throw err;
+  }
+}
 
 export async function attemptWithVerification<T>(
   targetPath: string,

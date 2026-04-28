@@ -2,7 +2,8 @@
  * delete_file MCP tool handler.
  *
  * Orchestrates the recursive delete + timeout-then-verify behaviour
- * specified in specs/005-fix-directory-delete/contracts/delete_file.md.
+ * specified in specs/005-fix-directory-delete/contracts/delete_file.md
+ * and amended by specs/007-fix-delete-verify-direct/contracts/delete_file.md.
  *
  * Responsibilities:
  *   1. Validate input via the zod schema (Constitution Principle III).
@@ -10,8 +11,12 @@
  *   3. Detect file-vs-directory-vs-missing by inspecting the parent listing.
  *   4. Drive the recursive walk for directories (via `recursive-delete.ts`).
  *   5. Issue the final outer delete (or single file delete) under
- *      timeout-then-verify protection.
- *   6. Translate every caught error to the contract's error categories.
+ *      timeout-then-verify protection, using a single direct-path
+ *      verification query (spec 007 FR-001) instead of a parent-listing
+ *      query.
+ *   6. Translate every caught error to the contract's error categories,
+ *      including the spec 007 `DeleteDidNotTakeEffectError` for the
+ *      verified-still-present outcome on the outer/single-file path.
  *
  * The handler always throws plain `Error`s on failure; the dispatcher's
  * existing `try/catch` in `src/index.ts` wraps them into the MCP
@@ -22,7 +27,6 @@ import { z } from 'zod';
 
 import {
   basename,
-  listingHasName,
   parentOf,
   PartialDeleteError,
   recursiveDeleteDirectory,
@@ -31,12 +35,11 @@ import {
 import { assertValidDeleteFileRequest } from './schema.js';
 import {
   attemptWithVerification,
+  DeleteDidNotTakeEffectError,
   OutcomeUndeterminedError,
+  pathExists,
 } from './verify-then-report.js';
-import {
-  ObsidianApiError,
-  ObsidianNotFoundError,
-} from '../../services/obsidian-rest-errors.js';
+import { ObsidianNotFoundError } from '../../services/obsidian-rest-errors.js';
 import { ObsidianRestService } from '../../services/obsidian-rest.js';
 
 
@@ -79,10 +82,14 @@ export async function handleDeleteFile(
       const outerResult = await attemptWithVerification(
         target,
         () => rest.deleteFile(target),
-        () => listingHasName(rest, parent, name)
+        () => pathExists(rest, target, 'directory')
       );
       if (outerResult.outcome === 'failure') {
-        throw new PartialDeleteError(target, [...walkState.deletedPaths]);
+        throw new DeleteDidNotTakeEffectError(
+          target,
+          walkState.filesRemoved,
+          walkState.subdirectoriesRemoved
+        );
       }
 
       return {
@@ -104,14 +111,10 @@ export async function handleDeleteFile(
     const fileResult = await attemptWithVerification(
       target,
       () => rest.deleteFile(target),
-      () => listingHasName(rest, parent, name)
+      () => pathExists(rest, target, 'file')
     );
     if (fileResult.outcome === 'failure') {
-      throw new ObsidianApiError(
-        -1,
-        `Obsidian API Error -1: delete failed for ${target}`,
-        fileResult.cause
-      );
+      throw new DeleteDidNotTakeEffectError(target, 0, 0);
     }
     return {
       content: [
@@ -138,6 +141,11 @@ export async function handleDeleteFile(
     if (err instanceof PartialDeleteError) {
       throw new Error(
         `child failed: ${err.failedPath} — already deleted: [${err.deletedPaths.join(', ')}]`
+      );
+    }
+    if (err instanceof DeleteDidNotTakeEffectError) {
+      throw new Error(
+        `delete did not take effect: ${err.targetPath} (filesRemoved=${err.filesRemoved}, subdirectoriesRemoved=${err.subdirectoriesRemoved})`
       );
     }
     if (err instanceof OutcomeUndeterminedError) {

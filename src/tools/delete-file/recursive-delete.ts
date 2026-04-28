@@ -9,14 +9,18 @@
  *
  * Per-item deletes go through `attemptWithVerification` so a transport
  * timeout that masks an actual upstream success does not prematurely
- * abort the walk (FR-008).
+ * abort the walk (FR-008). Spec 007 switches the per-item verification
+ * query from a parent-listing probe to a direct-path probe via
+ * `pathExists`, eliminating the auto-prune false-undetermined failure
+ * mode.
  *
  * The outer-directory delete is the handler's responsibility, not this
  * module's. See specs/005-fix-directory-delete/research.md § R3 for the
- * authoritative algorithm.
+ * walk algorithm and specs/007-fix-delete-verify-direct/data-model.md
+ * for the verification-query change.
  */
 
-import { attemptWithVerification } from './verify-then-report.js';
+import { attemptWithVerification, pathExists } from './verify-then-report.js';
 import { ObsidianRestService } from '../../services/obsidian-rest.js';
 
 
@@ -50,31 +54,17 @@ export function basename(path: string): string {
   return path.slice(idx + 1);
 }
 
-export async function listingHasName(
-  rest: ObsidianRestService,
-  parentDir: string,
-  name: string
-): Promise<'present' | 'absent'> {
-  const entries =
-    parentDir === ''
-      ? await rest.listFilesInVault()
-      : await rest.listFilesInDir(parentDir);
-  if (entries.includes(name) || entries.includes(`${name}/`)) return 'present';
-  return 'absent';
-}
-
 async function attemptChildDelete(
   rest: ObsidianRestService,
-  parentDir: string,
   childPath: string,
-  childName: string,
+  kind: 'file' | 'directory',
   walkState: WalkState
 ): Promise<'success' | 'failure'> {
   try {
     const result = await attemptWithVerification(
       childPath,
       () => rest.deleteFile(childPath),
-      () => listingHasName(rest, parentDir, childName)
+      () => pathExists(rest, childPath, kind)
     );
     return result.outcome;
   } catch (err) {
@@ -104,13 +94,7 @@ export async function recursiveDeleteDirectory(
 
       await recursiveDeleteDirectory(rest, childDir, walkState);
 
-      const outcome = await attemptChildDelete(
-        rest,
-        dirpath,
-        childDir,
-        childDirName,
-        walkState
-      );
+      const outcome = await attemptChildDelete(rest, childDir, 'directory', walkState);
       if (outcome === 'success') {
         walkState.deletedPaths.push(childDir);
         walkState.subdirectoriesRemoved += 1;
@@ -120,13 +104,7 @@ export async function recursiveDeleteDirectory(
     } else {
       const childFile = joinPath(dirpath, child);
 
-      const outcome = await attemptChildDelete(
-        rest,
-        dirpath,
-        childFile,
-        child,
-        walkState
-      );
+      const outcome = await attemptChildDelete(rest, childFile, 'file', walkState);
       if (outcome === 'success') {
         walkState.deletedPaths.push(childFile);
         walkState.filesRemoved += 1;
