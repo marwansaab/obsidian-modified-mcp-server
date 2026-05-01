@@ -81,6 +81,23 @@ export class ObsidianRestService {
   }
 
   /**
+   * Get the vault-wide tag index from the upstream's `GET /tags/` endpoint.
+   *
+   * Returns the response body as `unknown` deliberately: per spec 008
+   * FR-012 the wrapper forwards the body verbatim without reshaping, and
+   * the consumer (`handleListTags`) JSON-stringifies it for transport
+   * without inspecting individual fields. Typing the return as `unknown`
+   * prevents accidental wrapper-side narrowing that would drop additive
+   * upstream fields.
+   */
+  async listTags(): Promise<unknown> {
+    return this.safeCall(async () => {
+      const response = await this.client.get<unknown>('/tags/');
+      return response.data;
+    });
+  }
+
+  /**
    * Get the contents of a file
    * @param filepath - Path relative to vault root
    */

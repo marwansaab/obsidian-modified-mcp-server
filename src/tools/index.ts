@@ -5,6 +5,7 @@
 import { DELETE_FILE_TOOLS } from './delete-file/tool.js';
 import { FILE_TOOLS } from './file-tools.js';
 import { GRAPH_TOOLS } from './graph/tool.js';
+import { LIST_TAGS_TOOLS } from './list-tags/tool.js';
 import { OBSIDIAN_TOOLS } from './obsidian-tools.js';
 import { PERIODIC_TOOLS } from './periodic-tools.js';
 import { SEARCH_TOOLS } from './search-tools.js';
@@ -27,6 +28,7 @@ export const ALL_TOOLS: Tool[] = [
   ...GRAPH_TOOLS,
   ...SEMANTIC_TOOLS,
   ...SURGICAL_READ_TOOLS,
+  ...LIST_TAGS_TOOLS,
 ];
 
 export {
@@ -40,4 +42,5 @@ export {
   GRAPH_TOOLS,
   SEMANTIC_TOOLS,
   SURGICAL_READ_TOOLS,
+  LIST_TAGS_TOOLS,
 };
