@@ -28,6 +28,7 @@ import {
   handleGetVaultStructure,
 } from './tools/graph/handlers.js';
 import { ALL_TOOLS } from './tools/index.js';
+import { handleListTags } from './tools/list-tags/handler.js';
 import { handlePatchContent } from './tools/patch-content/handler.js';
 import { assertValidFindSimilarNotesRequest } from './tools/semantic-tools.js';
 import { handleGetFrontmatterField } from './tools/surgical-reads/handler-frontmatter.js';
@@ -316,6 +317,9 @@ export class ObsidianMCPServer {
           content: [{ type: 'text', text: JSON.stringify(files, null, 2) }],
         };
       }
+
+      case 'list_tags':
+        return handleListTags(args, rest);
 
       case 'list_files_in_dir': {
         const dirpath = args.dirpath as string;
