@@ -5,6 +5,16 @@
 **Status**: Draft
 **Input**: User description: "Add Tag Management — three new MCP tools wrapping the upstream Local REST API plugin's `/tags/...` surface so an LLM caller can read Obsidian's authoritative tag index, list files by tag, and atomically rename/add/remove tags."
 
+## Clarifications
+
+### Session 2026-05-01
+
+- Q: Should the wrapper pre-validate `tagname` / `target_tagname` content (empty or whitespace-only) before issuing any upstream request, or pass everything through verbatim? → A: Pre-validate and reject empty / whitespace-only tagnames with a wrapper-level validation error (after stripping any leading `#`); never construct a `/tags//` URL.
+- Q: When `tag_mutation` rename is called with a `target_tagname` that already exists as a separate tag, should the wrapper detect the collision client-side or pass through? → A: Pass through verbatim (upstream decides — typically merges); the wrapper does not pre-check, but `tag_mutation`'s description warns callers that renaming onto an existing tag merges into it, per upstream behavior.
+- Q: For `tag_mutation` rename, when `tagname` and `target_tagname` resolve to the same string after normalization (strip `#`, trim whitespace), should the wrapper pre-reject or pass through? → A: Pass through verbatim — upstream resolves the no-op; the wrapper does not short-circuit, in line with the thin-wrapper ethos.
+- Q: For `tag_mutation` add/remove, should the wrapper pre-validate `filepath` content beyond mere presence? → A: Yes — reject empty or whitespace-only `filepath` (after trimming) with a wrapper-level validation error before any HTTP request, symmetric with the tagname validation rule.
+- Q: For successful upstream responses on `list_tags` and `get_files_with_tag`, should the wrapper canonicalize the body into a stable wrapper-defined shape, or pass through verbatim? → A: Pass through the upstream success body verbatim (no reshaping); the observed shape is documented in plan/contracts against the upstream OpenAPI rather than re-imposed by the wrapper.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Read the authoritative tag index (Priority: P1)
@@ -172,6 +182,16 @@ single-file behavior.
   itself; it delegates to the upstream's single-call atomicity for rename
   and accepts that interleaved add/remove calls behave however the upstream
   serializes them.
+- **Rename onto an existing tag**: if `target_tagname` already exists in
+  the vault as a separate tag, the wrapper does not pre-check or block the
+  call; it passes the request through and the two tags are merged per
+  upstream behavior. The `tag_mutation` tool description warns callers of
+  this so that merging is an opt-in intent rather than a surprise.
+- **Rename to self**: if `tagname` and `target_tagname` resolve to the
+  same string after normalization (leading `#` stripped, whitespace
+  trimmed), the wrapper passes the call through unchanged; the upstream
+  resolves the no-op. The wrapper does not short-circuit or fabricate a
+  response.
 
 ## Requirements *(mandatory)*
 
@@ -193,7 +213,10 @@ single-file behavior.
 - **FR-005**: `tag_mutation` MUST validate that the operation-specific
   fields required by the chosen `operation` are present before issuing any
   upstream request, and MUST reject calls with a clear validation error
-  when they are missing.
+  when they are missing. For `add` and `remove`, the wrapper MUST also
+  reject `filepath` values that are empty or consist only of whitespace
+  after trimming, with the same pre-flight validation error shape used for
+  empty tagnames in FR-009.
 - **FR-006**: For `operation: rename`, the wrapper MUST perform the rename
   via a single upstream call and MUST NOT iterate files client-side. The
   vault-wide atomicity of the rename is the upstream's responsibility and
@@ -210,10 +233,17 @@ single-file behavior.
   inline and frontmatter tags and exclude tag-shaped strings inside fenced
   code blocks (the distinction that makes them more accurate than text
   search). `tag_mutation`'s description MUST state that `rename` is
-  vault-wide and atomic.
+  vault-wide and atomic, AND MUST warn callers that renaming onto a
+  `target_tagname` that already exists in the vault merges the two tags
+  per upstream behavior (the wrapper does not pre-check this collision).
 - **FR-009**: The wrapper MUST URL-encode tagnames when interpolating them
   into upstream paths and MUST accept tagnames provided with or without a
-  leading `#`, normalizing as needed for the upstream call.
+  leading `#`, normalizing as needed for the upstream call. After stripping
+  the optional leading `#` and trimming surrounding whitespace, the wrapper
+  MUST reject `tagname` and `target_tagname` values that are empty or
+  consist only of whitespace with a validation error before any HTTP
+  request is sent. This applies to `get_files_with_tag` and `tag_mutation`
+  alike.
 - **FR-010**: Regression tests MUST cover at least one tool from each
   operation category — read (`list_tags`), list-by-tag
   (`get_files_with_tag`), and mutation (`tag_mutation` with `rename`) —
@@ -224,6 +254,13 @@ single-file behavior.
   that a tool-listing caller perceives them as a single capability and is
   unlikely to mix them with the existing text-search or
   frontmatter-search tools when tag accuracy matters.
+- **FR-012**: For successful (2xx) upstream responses, the wrapper MUST
+  pass the response body through to the caller verbatim, without
+  reshaping, unwrapping, or omitting fields. This applies to `list_tags`,
+  `get_files_with_tag`, and `tag_mutation`. The observed response shape
+  is documented in `/speckit-plan` contracts against the upstream OpenAPI
+  spec but is not re-imposed by the wrapper, so additive upstream changes
+  reach callers without a wrapper update.
 
 ### Key Entities *(include if data involved)*
 
