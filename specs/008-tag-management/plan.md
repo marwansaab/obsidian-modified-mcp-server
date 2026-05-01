@@ -85,10 +85,14 @@ happy-path test and one input-validation-or-upstream-error test
   `zod-to-json-schema` derivative of the schema, and that the tool
   description mentions both the inline+frontmatter inclusion rule
   and the code-block exclusion rule (FR-008, SC-006).
-- `tests/tools/list-tags/handler.test.ts` — happy-path: nock the
-  upstream `GET /tags/` to return a fixture body containing a
-  hierarchical tag with parent-prefix roll-up; assert the wrapper
-  forwards the body verbatim (FR-010, FR-012, SC-002, SC-006).
+- `tests/tools/list-tags/handler.test.ts` — two happy-path cases.
+  (a) Populated index: nock the upstream `GET /tags/` to return a
+  fixture body containing a hierarchical tag with parent-prefix
+  roll-up; assert the wrapper forwards the body verbatim
+  (FR-010, FR-012, SC-002, SC-006). (b) Empty vault: nock the
+  upstream to return `{ "tags": [] }`; assert the wrapper returns
+  the empty index verbatim and does NOT raise (spec edge case
+  "Empty vault / no tags").
 - `tests/tools/list-tags/upstream-error.test.ts` — error path: nock
   the upstream to return 401; assert the wrapper raises an
   `ObsidianApiError` whose serialized text contains the upstream
