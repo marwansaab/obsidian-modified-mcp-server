@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
-Active feature plan: [specs/012-safe-rename/plan.md](specs/012-safe-rename/plan.md)
+Active feature plan: [specs/013-find-and-replace/plan.md](specs/013-find-and-replace/plan.md)
 
 For technologies, project structure, validator rules, contracts, and
 test matrices on the current feature, read the plan above and its
