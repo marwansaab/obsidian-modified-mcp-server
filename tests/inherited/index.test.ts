@@ -30,16 +30,14 @@
  * design — see T022's "Uncovered by design" section.
  */
 
+import nock from 'nock';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-
-import nock from 'nock';
 import {
   describe,
   it,
   expect,
-  beforeAll,
   afterAll,
   beforeEach,
   afterEach,
@@ -98,7 +96,7 @@ writeFileSync(
 // modification of `src/`.
 vi.hoisted(() => {
   const original = process.exit.bind(process);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   (process as unknown as { exit: (code?: number) => void }).exit = (code) => {
     if (code === 1) {
       // Swallow main()'s "Failed to start server" exit — see comment above.

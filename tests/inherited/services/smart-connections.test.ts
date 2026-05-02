@@ -13,7 +13,7 @@
 
 import { AxiosError } from 'axios';
 import nock from 'nock';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 
 import { SmartConnectionsService } from '../../../src/services/smart-connections.js';
 

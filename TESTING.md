@@ -26,6 +26,11 @@ This runs the full Vitest suite under V8 coverage. On success you see:
   - `coverage-summary.json` — aggregate totals; this is what the build
     gate reads.
 
+The `coverage/` tree is excluded from `npm run lint` at the ESLint
+flat-config level (`ignores` in [`eslint.config.js`](eslint.config.js)),
+because everything inside it is a generated artifact of the coverage
+tooling, not source we own.
+
 Watch mode for development:
 
 ```bash
