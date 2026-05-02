@@ -4,6 +4,7 @@
 
 import { DELETE_FILE_TOOLS } from './delete-file/tool.js';
 import { FILE_TOOLS } from './file-tools.js';
+import { FIND_AND_REPLACE_TOOLS } from './find-and-replace/tool.js';
 import { GRAPH_TOOLS } from './graph/tool.js';
 import { LIST_TAGS_TOOLS } from './list-tags/tool.js';
 import { OBSIDIAN_TOOLS } from './obsidian-tools.js';
@@ -30,11 +31,12 @@ export const ALL_TOOLS: Tool[] = [
   ...SEMANTIC_TOOLS,
   ...SURGICAL_READ_TOOLS,
   ...LIST_TAGS_TOOLS,
-  // RENAME_FILE_TOOLS intentionally NOT included until Tier 2 backlog
-  // item 25 (find_and_replace) ships and the rename_file handler (T005)
-  // is in. See specs/012-safe-rename/plan.md §"Project Structure" for
-  // the "no false advertisement" rationale. Restoring this entry is a
-  // one-line edit (T006-restore in tasks.md) once the handler exists.
+  ...FIND_AND_REPLACE_TOOLS,
+  // RENAME_FILE_TOOLS intentionally NOT included until 012's
+  // rename_file handler ships (it's gated on this feature's
+  // rest.findAndReplace, which is now available — see
+  // specs/012-safe-rename/plan.md §"Implementation order constraint").
+  // The 012 unblock work is tracked in 012's tasks file.
 ];
 
 export {
@@ -50,4 +52,5 @@ export {
   SURGICAL_READ_TOOLS,
   LIST_TAGS_TOOLS,
   RENAME_FILE_TOOLS,
+  FIND_AND_REPLACE_TOOLS,
 };

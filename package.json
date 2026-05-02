@@ -1,6 +1,6 @@
 {
   "name": "@marwansaab/obsidian-modified-mcp-server",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Personal fork of @connorbritain/obsidian-mcp-server. TypeScript MCP server for Obsidian with wrapper-side mitigations of upstream limitations — first concrete change is re-enabling patch_content under a structural-only path validator.",
   "type": "module",
   "main": "dist/index.js",

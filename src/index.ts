@@ -18,6 +18,7 @@ import { GraphService } from './services/graph-service.js';
 import { ObsidianRestService } from './services/obsidian-rest.js';
 import { SmartConnectionsService } from './services/smart-connections.js';
 import { handleDeleteFile } from './tools/delete-file/handler.js';
+import { handleFindAndReplace } from './tools/find-and-replace/handler.js';
 import {
   handleDetectNoteClusters,
   handleFindOrphanNotes,
@@ -357,6 +358,9 @@ export class ObsidianMCPServer {
 
       case 'patch_content':
         return handlePatchContent(args, rest);
+
+      case 'find_and_replace':
+        return handleFindAndReplace(args, rest, vaultId);
 
       case 'append_content': {
         const filepath = args.filepath as string;
