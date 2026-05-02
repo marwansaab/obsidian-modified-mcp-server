@@ -8,6 +8,7 @@ import { GRAPH_TOOLS } from './graph/tool.js';
 import { LIST_TAGS_TOOLS } from './list-tags/tool.js';
 import { OBSIDIAN_TOOLS } from './obsidian-tools.js';
 import { PERIODIC_TOOLS } from './periodic-tools.js';
+import { RENAME_FILE_TOOLS } from './rename-file/tool.js';
 import { SEARCH_TOOLS } from './search-tools.js';
 import { SEMANTIC_TOOLS } from './semantic-tools.js';
 import { SURGICAL_READ_TOOLS } from './surgical-reads/tool.js';
@@ -29,6 +30,7 @@ export const ALL_TOOLS: Tool[] = [
   ...SEMANTIC_TOOLS,
   ...SURGICAL_READ_TOOLS,
   ...LIST_TAGS_TOOLS,
+  ...RENAME_FILE_TOOLS,
 ];
 
 export {
@@ -43,4 +45,5 @@ export {
   SEMANTIC_TOOLS,
   SURGICAL_READ_TOOLS,
   LIST_TAGS_TOOLS,
+  RENAME_FILE_TOOLS,
 };

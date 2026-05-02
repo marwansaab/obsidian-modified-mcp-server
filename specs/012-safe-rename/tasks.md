@@ -27,7 +27,7 @@ description: "Task list for 012-safe-rename: rename_file MCP tool"
 
 **Purpose**: Create the empty module skeleton so subsequent tasks have somewhere to write.
 
-- [ ] T001 Create empty directories `src/tools/rename-file/` and `tests/tools/rename-file/` at the repo root. (No files yet — those are created by later tasks.)
+- [X] T001 Create empty directories `src/tools/rename-file/` and `tests/tools/rename-file/` at the repo root. (No files yet — those are created by later tasks.)
 
 ---
 
@@ -51,10 +51,10 @@ description: "Task list for 012-safe-rename: rename_file MCP tool"
 
 ### Implementation for User Story 1
 
-- [ ] T003 [P] [US1] Create `src/tools/rename-file/schema.ts` with the zod schema `RenameFileRequestSchema` (`old_path: z.string().trim().min(1)`, `new_path: z.string().trim().min(1)`, `vaultId: z.string().trim().optional()`) and the boundary helper `assertValidRenameFileRequest(args: unknown): RenameFileRequest`. Mirror the structure of [src/tools/list-tags/schema.ts](../../src/tools/list-tags/schema.ts). Schema field text MUST match the descriptions in [contracts/rename_file.md §"Input schema (zod)"](./contracts/rename_file.md).
-- [ ] T004 [P] [US1] Create `src/tools/rename-file/tool.ts` exporting `RENAME_FILE_TOOLS: Tool[]` with one entry. The `inputSchema` MUST be derived from `RenameFileRequestSchema` via `zodToJsonSchema(..., { $refStrategy: 'none' })` (Constitution Principle III — single source of truth). The `description` field MUST contain verbatim the text in [contracts/rename_file.md §"Description text (verbatim, including the precondition)"](./contracts/rename_file.md), including all four pinned substrings: `"Automatically update internal links"`, `"Settings → Files & Links"`, `"Folder paths are out of scope"`, `"Missing parent folders are not auto-created"`. Mirror [src/tools/list-tags/tool.ts](../../src/tools/list-tags/tool.ts).
+- [X] T003 [P] [US1] Create `src/tools/rename-file/schema.ts` with the zod schema `RenameFileRequestSchema` (`old_path: z.string().trim().min(1)`, `new_path: z.string().trim().min(1)`, `vaultId: z.string().trim().optional()`) and the boundary helper `assertValidRenameFileRequest(args: unknown): RenameFileRequest`. Mirror the structure of [src/tools/list-tags/schema.ts](../../src/tools/list-tags/schema.ts). Schema field text MUST match the descriptions in [contracts/rename_file.md §"Input schema (zod)"](./contracts/rename_file.md).
+- [X] T004 [P] [US1] Create `src/tools/rename-file/tool.ts` exporting `RENAME_FILE_TOOLS: Tool[]` with one entry. The `inputSchema` MUST be derived from `RenameFileRequestSchema` via `zodToJsonSchema(..., { $refStrategy: 'none' })` (Constitution Principle III — single source of truth). The `description` field MUST contain verbatim the text in [contracts/rename_file.md §"Description text (verbatim, including the precondition)"](./contracts/rename_file.md), including all four pinned substrings: `"Automatically update internal links"`, `"Settings → Files & Links"`, `"Folder paths are out of scope"`, `"Missing parent folders are not auto-created"`. Mirror [src/tools/list-tags/tool.ts](../../src/tools/list-tags/tool.ts).
 - [ ] T005 [US1] Create `src/tools/rename-file/handler.ts` with `handleRenameFile(args: unknown, rest: ObsidianRestService): Promise<CallToolResult>` per the pseudocode in [contracts/rename_file.md §"Behavioural contract"](./contracts/rename_file.md). Hardcode the `RENAME_COMMAND_ID` constant captured in T002. Flow: zod parse (rethrow ZodError as plain Error with field path inlined, matching [src/tools/list-tags/handler.ts](../../src/tools/list-tags/handler.ts)) → if `old_path === new_path` short-circuit with success response (FR-009) → `await rest.openFile(old_path)` (R3 in research.md) → `await rest.executeCommand(RENAME_COMMAND_ID)` with whatever body shape T002 confirmed → return JSON-echo `{old_path, new_path}` in a single text content block. NO try/catch around the REST calls (`openFile`, `executeCommand`); the **only** allowed catch is the zod-parse re-throw shown in the contract pseudocode (Q1 / Principle IV). Depends on T002, T003.
-- [ ] T006 [US1] Wire the new tool into the aggregation by adding `...RENAME_FILE_TOOLS` to the `TOOLS` export in `src/tools/index.ts`. Match the existing pattern (alphabetical or insertion-order — follow what's already there).
+- [X] T006 [US1] Wire the new tool into the aggregation by adding `...RENAME_FILE_TOOLS` to the `ALL_TOOLS` export in `src/tools/index.ts`. (Note: the actual export name in this repo is `ALL_TOOLS`, not `TOOLS` as originally written here — the export was matched, not the wording.)
 - [ ] T007 [US1] Add a `case 'rename_file': return handleRenameFile(args, rest);` branch to the dispatcher switch in `src/index.ts`, in the same alphabetical/grouping position used by other recent tools (look for the `case 'list_tags':` or similar nearby example). Import `handleRenameFile` from `./tools/rename-file/handler.js`.
 
 ### Tests for User Story 1 (REQUIRED — Constitution Principle II) ⚠️
@@ -101,7 +101,7 @@ description: "Task list for 012-safe-rename: rename_file MCP tool"
 
 ### Tests for User Story 3 (REQUIRED — Constitution Principle II) ⚠️
 
-- [ ] T015 [P] [US3] Create `tests/tools/rename-file/registration.test.ts` that imports `RENAME_FILE_TOOLS` and asserts the `description` field of the `rename_file` entry contains all four pinned substrings (separately, in three named tests per [contracts/rename_file.md §"Test-coverage contract"](./contracts/rename_file.md)):
+- [X] T015 [P] [US3] Create `tests/tools/rename-file/registration.test.ts` that imports `RENAME_FILE_TOOLS` and asserts the `description` field of the `rename_file` entry contains all four pinned substrings (separately, in three named tests per [contracts/rename_file.md §"Test-coverage contract"](./contracts/rename_file.md)):
   - Test "description includes the link-update precondition" — asserts `description` contains both `"Automatically update internal links"` AND `"Settings → Files & Links"`.
   - Test "description includes the folder-out-of-scope clause" — asserts `description` contains `"Folder paths are out of scope"`.
   - Test "description includes the no-auto-create clause" — asserts `description` contains `"Missing parent folders are not auto-created"`.
