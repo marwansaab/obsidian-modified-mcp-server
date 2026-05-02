@@ -1,23 +1,32 @@
 /**
- * rename_file tool: MCP `Tool[]` registration entry.
+ * rename_file tool: MCP `Tool[]` registration entry — Option B.
  *
  * The `inputSchema` is derived from `RenameFileRequestSchema` via
  * `zod-to-json-schema` so the published JSON Schema and the runtime
  * validator cannot drift apart (Constitution Principle III).
  *
- * The description text advertises (FR-005) the precondition that
- * Obsidian's "Automatically update internal links" setting must be
- * enabled for the tool's wikilink-integrity guarantee to hold, and
- * names the UI location of that setting verbatim. It also calls out
- * the folder-out-of-scope rule (FR-001a / Q2) and the no-auto-create
- * rule (FR-012 / Q3) so MCP-aware agents can adopt the tool safely
- * by reading the catalogue alone (User Story 3 / SC-002).
+ * The description text discloses (FR-005) four operational properties
+ * that callers need before invoking:
+ *   (a) the operation is multi-step and not atomic
+ *   (b) the caller should invoke against a clean git working tree
+ *       (`git restore .` is the documented rollback baseline)
+ *   (c) which wikilink shapes are reliably rewritten (FR-014 catalogue)
+ *   (d) the Obsidian "Automatically update internal links" setting is
+ *       irrelevant under this implementation
  *
- * Tests in `tests/tools/rename-file/registration.test.ts` pin the
- * four substrings ("Automatically update internal links",
- * "Settings → Files & Links", "Folder paths are out of scope",
- * "Missing parent folders are not auto-created") so that any
+ * Tests in `tests/tools/rename-file/registration.test.ts` pin the four
+ * substrings ("multi-step and not atomic", "clean git working tree",
+ * "Wikilink shape coverage", and the irrelevance statement) so any
  * accidental edit fails CI.
+ *
+ * Implementation status: schema and tool registration ship in this
+ * commit (Option-B documentation pivot); the handler ships once
+ * Tier 2 backlog item 25 (`find_and_replace`) lands and exposes
+ * `rest.findAndReplace` on `ObsidianRestService` (FR-013). Until then,
+ * `RENAME_FILE_TOOLS` is intentionally NOT included in the `ALL_TOOLS`
+ * aggregation in `src/tools/index.ts` — per the project's "no false
+ * advertisement" pattern, the tool isn't exposed via `tools/list`
+ * until it can actually work.
  */
 
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -35,21 +44,31 @@ export const RENAME_FILE_TOOLS: Tool[] = [
     name: 'rename_file',
     description:
       'Rename a file in the vault while preserving wikilink integrity vault-wide. ' +
-      'Accepts old_path and new_path (both vault-relative). Dispatches Obsidian\'s ' +
-      'built-in "Rename file" command via the existing command-execution endpoint, ' +
-      'so every [[wikilink]] and ![[embed]] referencing the old name is rewritten ' +
-      'in the same operation. ' +
-      'Precondition: this tool\'s wikilink-integrity guarantee depends on Obsidian\'s ' +
-      '"Automatically update internal links" setting being enabled in the focused ' +
-      'vault (Settings → Files & Links). If that setting is off, the file rename ' +
-      'will still succeed but referencing wikilinks will NOT be rewritten. Verify ' +
-      'the setting before relying on this tool. ' +
+      'Accepts old_path and new_path (both vault-relative). Performs a multi-step ' +
+      'composition: pre-flight checks (source exists, destination does not, parent ' +
+      'folder exists), reads the source, writes the destination, runs vault-wide ' +
+      'wikilink rewrites via find_and_replace, then deletes the source. ' +
+      'The operation is multi-step and not atomic. Failure after the destination ' +
+      'write leaves the vault in a partial state; the structured response identifies ' +
+      'the failed step and what was written. The wrapper performs no automated ' +
+      'recovery. ' +
+      'Precondition: invoke against a clean git working tree. `git restore .` from ' +
+      'the pre-call commit is the documented rollback baseline for any partial state. ' +
+      'Wikilink shape coverage. Reliably rewritten on rename: [[basename]], ' +
+      '[[basename|alias]], [[basename#heading]], [[basename#heading|alias]], ' +
+      '[[basename#^block-id]], ![[basename]], ![[basename|alias]]. For cross-folder ' +
+      'renames, full-path forms ([[old-folder/basename]] and variants) are also ' +
+      'rewritten. Out of scope: relative-path forms ([[../folder/basename]]) and ' +
+      'markdown-style links ([text](path.md)) — callers needing these must perform ' +
+      'additional find_and_replace passes themselves. ' +
+      'The Obsidian "Automatically update internal links" setting is irrelevant ' +
+      'under this implementation. Wikilink integrity comes from the wrapper\'s own ' +
+      'regex passes through find_and_replace, not from Obsidian\'s index. The setting ' +
+      'need not be enabled and has no effect when toggled. ' +
       'Scope: any vault file (markdown notes and attachments such as images, PDFs, ' +
       'audio). Folder paths are out of scope and will be rejected. Missing parent ' +
       'folders are not auto-created — the caller must ensure the destination folder ' +
-      'exists. Errors from the underlying Obsidian command (file not found, ' +
-      'destination already exists, missing folder, locked file, etc.) are propagated ' +
-      'verbatim.',
+      'exists.',
     inputSchema,
   },
 ];

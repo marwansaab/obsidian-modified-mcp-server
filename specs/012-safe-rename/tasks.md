@@ -1,15 +1,17 @@
 ---
-description: "Task list for 012-safe-rename: rename_file MCP tool"
+description: "Task list for 012-safe-rename: rename_file MCP tool — Option B"
 ---
 
-# Tasks: Safe Rename Tool (`rename_file`)
+# Tasks: Safe Rename Tool (`rename_file`) — Option B
 
 **Input**: Design documents from `specs/012-safe-rename/`
 **Prerequisites**: [plan.md](./plan.md) (required), [spec.md](./spec.md) (required for user stories), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/rename_file.md](./contracts/rename_file.md), [quickstart.md](./quickstart.md)
 
-**Tests**: REQUIRED, not optional. Constitution Principle II ("Public Tool Test Coverage") is **NON-NEGOTIABLE** for this project: every registered MCP tool MUST have at least one happy-path test and at least one input-validation/upstream-error test, and those tests MUST land in the same change as the tool. The minimum test surface for this feature is enumerated in [contracts/rename_file.md §"Test-coverage contract"](./contracts/rename_file.md).
+**Status**: Documentation pivot complete (Option-B redesign per T002 spike outcome). Implementation gated on Tier 2 backlog item 25 (`find_and_replace`) shipping first per FR-013 / [research.md §R12](./research.md).
 
-**Organization**: Tasks are grouped by user story (US1, US2, US3) to enable independent demonstration. Note: because all three stories share a single tool module (one `tool.ts`, one `handler.ts`, one `schema.ts`), the *code* is delivered in US1; US2 and US3 each add **test coverage** that pins behaviour US1 already exhibits. This is intentional — see "Implementation Strategy" below.
+**Tests**: REQUIRED, not optional. Constitution Principle II ("Public Tool Test Coverage") is **NON-NEGOTIABLE** for this project: every registered MCP tool MUST have at least one happy-path test and at least one input-validation/upstream-error test, and those tests MUST land in the same change as the tool. The minimum test surface for this feature is enumerated in [contracts/rename_file.md §"Test-coverage contract"](./contracts/rename_file.md) — 6 registration tests + ~10 regex-pass tests + 7 handler tests.
+
+**Organization**: Tasks are grouped by user story (US1, US2, US3) plus the Option-B-specific cross-cutting tasks. Many tasks are marked **DEFERRED — gated on item 25**; those wait for the upstream `rest.findAndReplace` helper to ship before they can be implemented.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -25,105 +27,102 @@ description: "Task list for 012-safe-rename: rename_file MCP tool"
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: Create the empty module skeleton so subsequent tasks have somewhere to write.
-
-- [X] T001 Create empty directories `src/tools/rename-file/` and `tests/tools/rename-file/` at the repo root. (No files yet — those are created by later tasks.)
+- [X] T001 Create empty directories `src/tools/rename-file/` and `tests/tools/rename-file/` at the repo root.
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Resolve the one external unknown that everything else depends on.
+**Status**: SPIKE EXECUTED — NEGATIVE OUTCOME — drove the Option-B pivot.
 
-**⚠️ CRITICAL**: T002 BLOCKS all user-story phases. Do not start US1 implementation tasks until T002 has produced a working `RENAME_COMMAND_ID` (and request-body shape, if applicable).
+- [X] T002 Run the pre-implementation feasibility spike per [quickstart.md Part 1](./quickstart.md). **Outcome (2026-05-02): NEGATIVE.** Neither `workspace:edit-file-title` nor `file-explorer:move-file` performs a programmatic rename when dispatched headlessly via `POST /commands/{commandId}/`; both open Obsidian UI inputs. No body shape works. The user chose **Option B** as the recovery path: replace the Obsidian-command dispatch with wrapper-side composition over filesystem primitives + `find_and_replace` (Tier 2 backlog item 25). See [research.md §R5](./research.md) for the full result and [spec.md §Clarifications "post-spike"](./spec.md) for the design pivot. Restoring the Obsidian-managed approach is captured as backlog item 28 (deferred; pending upstream plugin enhancement; out of project control).
 
-- [ ] T002 Run the pre-implementation feasibility spike per [quickstart.md Part 1](./quickstart.md). Confirms: (a) the exact Obsidian command id for "Rename file" against the project's `coddingtonbear/obsidian-local-rest-api` plugin, and (b) that `POST /commands/{commandId}` actually performs a programmatic rename (not just a UI modal) and triggers wikilink rewriting. **Pass criteria**: one command id + body shape produces an on-disk rename AND rewrites `notes/index.md` wikilinks. **Fail action**: stop and escalate to user before T003 — do NOT write handler code. **Output to capture**: the working `commandId` and any required request-body shape (record in PR comment or temporary `specs/012-safe-rename/spike-results.md`; this becomes the `RENAME_COMMAND_ID` constant in T005). Performed manually against a real Obsidian instance with the Local REST API plugin enabled.
-
-**Checkpoint**: Foundation ready — user story implementation can begin.
+**Checkpoint**: Spike resolved with Option-B redesign. The documentation-pivot tasks (this commit) follow. Implementation tasks marked **DEFERRED — gated on item 25** wait for the `find_and_replace` feature to ship and merge to main.
 
 ---
 
 ## Phase 3: User Story 1 - Rename a file and keep every wikilink intact (Priority: P1) 🎯 MVP
 
-**Goal**: A caller invokes `rename_file(old_path, new_path)` and Obsidian renames the file while rewriting every `[[wikilink]]` and `![[embed]]` referencing the old name. This phase delivers the entire functional pipeline; subsequent phases add test coverage that pins additional contracts but ship no new runtime code.
+**Goal**: A caller invokes `rename_file(old_path, new_path)` and the wrapper performs the multi-step composition (3 pre-flight checks → read source → write destination → 3 or 4 `find_and_replace` passes → delete source), returning a structured success response that names the passes that ran and the per-pass rewrite counts.
 
-**Independent Test**: With the Obsidian "Automatically update internal links" setting ON, set up a vault containing `notes/alpha.md` plus `notes/index.md` whose body is `See [[alpha]] for details.`; invoke `rename_file({old_path: "notes/alpha.md", new_path: "notes/beta.md"})`; assert `notes/beta.md` exists, `notes/alpha.md` does not, and `notes/index.md` now reads `See [[beta]] for details.` (Spec User Story 1, Acceptance Scenario 1.)
+**Independent Test**: Per [quickstart.md Part 2 Step 3](./quickstart.md) (single-folder rename) and [Step 4](./quickstart.md) (cross-folder rename, exercising Pass D). Both run against a real Obsidian instance with the vault on a clean git working tree.
 
 ### Implementation for User Story 1
 
-- [X] T003 [P] [US1] Create `src/tools/rename-file/schema.ts` with the zod schema `RenameFileRequestSchema` (`old_path: z.string().trim().min(1)`, `new_path: z.string().trim().min(1)`, `vaultId: z.string().trim().optional()`) and the boundary helper `assertValidRenameFileRequest(args: unknown): RenameFileRequest`. Mirror the structure of [src/tools/list-tags/schema.ts](../../src/tools/list-tags/schema.ts). Schema field text MUST match the descriptions in [contracts/rename_file.md §"Input schema (zod)"](./contracts/rename_file.md).
-- [X] T004 [P] [US1] Create `src/tools/rename-file/tool.ts` exporting `RENAME_FILE_TOOLS: Tool[]` with one entry. The `inputSchema` MUST be derived from `RenameFileRequestSchema` via `zodToJsonSchema(..., { $refStrategy: 'none' })` (Constitution Principle III — single source of truth). The `description` field MUST contain verbatim the text in [contracts/rename_file.md §"Description text (verbatim, including the precondition)"](./contracts/rename_file.md), including all four pinned substrings: `"Automatically update internal links"`, `"Settings → Files & Links"`, `"Folder paths are out of scope"`, `"Missing parent folders are not auto-created"`. Mirror [src/tools/list-tags/tool.ts](../../src/tools/list-tags/tool.ts).
-- [ ] T005 [US1] Create `src/tools/rename-file/handler.ts` with `handleRenameFile(args: unknown, rest: ObsidianRestService): Promise<CallToolResult>` per the pseudocode in [contracts/rename_file.md §"Behavioural contract"](./contracts/rename_file.md). Hardcode the `RENAME_COMMAND_ID` constant captured in T002. Flow: zod parse (rethrow ZodError as plain Error with field path inlined, matching [src/tools/list-tags/handler.ts](../../src/tools/list-tags/handler.ts)) → if `old_path === new_path` short-circuit with success response (FR-009) → `await rest.openFile(old_path)` (R3 in research.md) → `await rest.executeCommand(RENAME_COMMAND_ID)` with whatever body shape T002 confirmed → return JSON-echo `{old_path, new_path}` in a single text content block. NO try/catch around the REST calls (`openFile`, `executeCommand`); the **only** allowed catch is the zod-parse re-throw shown in the contract pseudocode (Q1 / Principle IV). Depends on T002, T003.
-- [X] T006 [US1] Wire the new tool into the aggregation by adding `...RENAME_FILE_TOOLS` to the `ALL_TOOLS` export in `src/tools/index.ts`. (Note: the actual export name in this repo is `ALL_TOOLS`, not `TOOLS` as originally written here — the export was matched, not the wording.)
-- [ ] T007 [US1] Add a `case 'rename_file': return handleRenameFile(args, rest);` branch to the dispatcher switch in `src/index.ts`, in the same alphabetical/grouping position used by other recent tools (look for the `case 'list_tags':` or similar nearby example). Import `handleRenameFile` from `./tools/rename-file/handler.js`.
+- [X] T003 [P] [US1] `src/tools/rename-file/schema.ts` — UNCHANGED for Option B. The `RenameFileRequestSchema` (`old_path`, `new_path`, optional `vaultId`) is identical between Option A and Option B. Already shipped in commit `bebe709`.
+- [X] T004 [P] [US1] `src/tools/rename-file/tool.ts` — DESCRIPTION REWRITTEN for Option B. The tool registration now ships the Option-B description text per [contracts/rename_file.md §"Description text"](./contracts/rename_file.md), pinning four substrings: multi-step/non-atomic, clean git working tree, wikilink shape coverage, and irrelevance of the Obsidian "Automatically update internal links" setting. Updated in this Option-B documentation pivot commit.
+- [ ] T004a [P] [US1] **NEW under Option B.** `src/tools/rename-file/regex-passes.ts` — exports `escapeRegex(str: string): string` and four pass-builder functions (`buildPassA({oldBasename, newBasename})`, `buildPassB(...)`, `buildPassC(...)`, `buildPassD({oldBasename, newBasename, oldFolder, newFolder})`) per the templates in [contracts/rename_file.md §"Composition algorithm" step 6](./contracts/rename_file.md). Each builder returns `{pattern: string, replacement: string}`. Spike-independent and ships in this Option-B documentation pivot commit (the regex correctness can be pinned by hermetic tests before the handler exists).
+- [ ] T005 [US1] **DEFERRED — gated on item 25.** `src/tools/rename-file/handler.ts` per the pseudocode in [contracts/rename_file.md §"Behavioural contract"](./contracts/rename_file.md). The handler imports `rest.findAndReplace` from the per-vault `ObsidianRestService` (provided by Tier 2 backlog item 25 / FR-013), composes the 8-step algorithm (`pre_flight_source` → `pre_flight_destination` → `pre_flight_parent` → `read_source` → `write_destination` → `find_and_replace_pass_A`/`_B`/`_C` and conditionally `_D` → `delete_source`), and returns either the FR-011 success structure or the FR-015 mid-flight failure structure. **Cannot start until item 25 has shipped to main.** Depends on T003, T004, T004a.
+- [ ] T006-restore [US1] **DEFERRED — gated on T005.** Re-add `...RENAME_FILE_TOOLS` to the `ALL_TOOLS` array in `src/tools/index.ts`. Currently un-wired (per the "no false advertisement" principle — see [plan.md §"Project Structure"](./plan.md)) so the tool isn't visible in `tools/list` until the handler exists. Trivial one-line edit when the handler ships.
+- [ ] T007 [US1] **DEFERRED — gated on T005.** Add `case 'rename_file': return handleRenameFile(args, rest);` to the dispatcher switch in `src/index.ts`, in alphabetical/grouping order with the other recent tools. Imports `handleRenameFile` from `./tools/rename-file/handler.js`.
 
 ### Tests for User Story 1 (REQUIRED — Constitution Principle II) ⚠️
 
 > Write these tests FIRST or in parallel with the implementation, NOT after. Verify each test FAILS in the absence of its corresponding implementation task before marking it green.
 
-- [ ] T008 [P] [US1] Create `tests/tools/rename-file/handler.test.ts` with the **happy-path** test: build a mocked `ObsidianRestService` with vi-spy `openFile` and `executeCommand` that resolve to undefined; call `handleRenameFile({old_path: "notes/alpha.md", new_path: "notes/beta.md"}, mockRest)`; assert `mockRest.openFile` was called once with `"notes/alpha.md"`, `mockRest.executeCommand` was called once with the `RENAME_COMMAND_ID` constant (and any expected body shape), and the returned `CallToolResult` content matches the JSON `{ "old_path": "notes/alpha.md", "new_path": "notes/beta.md" }` shape from [contracts/rename_file.md §"Output: success"](./contracts/rename_file.md). Use `vitest`'s `describe`/`it`/`expect` and `vi.fn()`. Reference [tests/tools/](../../tests/tools/) for established mocking patterns in this repo.
-- [ ] T009 [US1] Add the **FR-009 no-op test** to `tests/tools/rename-file/handler.test.ts`: with the same mocked `rest`, call `handleRenameFile({old_path: "x.md", new_path: "x.md"}, mockRest)`; assert the response echoes both fields as `"x.md"` AND that neither `mockRest.openFile` nor `mockRest.executeCommand` was invoked (`expect(mockRest.openFile).not.toHaveBeenCalled()`).
-- [ ] T010 [US1] Add the **validation-error test** to `tests/tools/rename-file/handler.test.ts`: call `handleRenameFile({}, mockRest)`; assert it throws an `Error` whose message matches `/^Invalid input — old_path: /`. This pins the zod re-throw shape used by the dispatcher's outer error handler.
+- [ ] T004b [P] [US1] **NEW under Option B.** `tests/tools/rename-file/regex-passes.test.ts` — hermetic tests for each of Passes A, B, C, D against synthetic strings, plus tests for `escapeRegex` itself. Covers the ~10 test cases enumerated in [contracts/rename_file.md §"Test-coverage contract"](./contracts/rename_file.md) under `regex-passes.test.ts`. Spike-independent and ships in this Option-B documentation pivot commit. The tests construct each pass's regex using `buildPassN` helpers, then `String.prototype.replace`-test against handcrafted before/after pairs.
+- [ ] T008 [P] [US1] **DEFERRED — gated on T005.** Create `tests/tools/rename-file/handler.test.ts` with the **happy-path** test: build a mocked `ObsidianRestService` with vi-spy `getFileContents`, `putContent`, `listFilesInDir`, `findAndReplace`, `deleteFile` that resolve in algorithm order; call `handleRenameFile({old_path: "notes/alpha.md", new_path: "notes/beta.md"}, mockRest)`; assert all 5 methods were called in algorithm order with the right arguments, and the returned `CallToolResult` content matches the FR-011 success shape including non-empty `wikilinkPassesRun` and the per-pass `wikilinkRewriteCounts`.
+- [ ] T009 [US1] **DEFERRED — gated on T005.** Add the **FR-009 no-op test** to `handler.test.ts`: identical paths → empty `wikilinkPassesRun`, all `wikilinkRewriteCounts` null, zero REST calls.
+- [ ] T010 [US1] **DEFERRED — gated on T005.** Add the **validation-error test** to `handler.test.ts`: missing `old_path` → throws `Invalid input — old_path: …`.
 
 ### Manual end-to-end verification for User Story 1
 
-- [ ] T011 [US1] Run [quickstart.md](./quickstart.md) Part 2 Steps 1, 3, 7, 8 against a real Obsidian instance: confirm description (Step 2 covered in US3), happy path with wikilink rewriting (Step 3), idempotent no-op (Step 7), validation failure (Step 8).
+- [ ] T011 [US1] **DEFERRED — gated on T005, T006-restore, T007.** Run [quickstart.md](./quickstart.md) Part 2 Steps 1, 2, 3, 4 against a real Obsidian instance with TestVault on a clean git working tree.
 
-**Checkpoint**: User Story 1 is fully functional. The MVP is shippable here — US2 and US3 add test coverage that pins additional contract surface but no new runtime behaviour.
+**Checkpoint**: User Story 1 functional once item 25 ships and T005/T006-restore/T007 land. The documentation pivot in this commit is the prep work; the runtime work waits.
 
 ---
 
 ## Phase 4: User Story 2 - Refuse to rename when the target already exists (Priority: P2)
 
-**Goal**: When the rename would collide with an existing file or the source doesn't exist, the tool returns an error and the vault is byte-for-byte unchanged. Per Q1 (pure delegation), this behaviour is inherited from Obsidian's command failure path; this phase pins it with tests.
+**Goal**: When the rename would collide with an existing file, the source doesn't exist, or the destination's parent folder is missing, the tool returns a clear error and the vault is byte-for-byte unchanged. Per the Q1 supersession (Clarifications session, post-spike), the collision check (FR-006) is now wrapper-side and constructs its own error message; the source-missing (FR-007) and parent-missing (FR-012) checks remain pure delegation.
 
-**Independent Test**: In a vault containing `a.md` and `b.md`, invoke `rename_file({old_path: "a.md", new_path: "b.md"})`; assert the tool returns an error AND both files are still on disk byte-for-byte unchanged. (Spec User Story 2.)
+**Independent Test**: Per [quickstart.md Part 2 Steps 5, 6, 7, 8](./quickstart.md).
 
-### Tests for User Story 2 (REQUIRED — Constitution Principle II) ⚠️
+### Tests for User Story 2 (REQUIRED) ⚠️
 
-- [ ] T012 [P] [US2] Add the **failure-path propagation** test to `tests/tools/rename-file/handler.test.ts`: mock `rest.executeCommand` to reject with an `ObsidianApiError` (or other typed upstream error from `src/services/obsidian-rest-errors.ts`); call the handler with valid inputs; assert the handler does NOT catch the error and the rejection propagates to the test (`await expect(handleRenameFile(...)).rejects.toThrow(ObsidianApiError)`). This is the explicit test for Constitution Principle IV / spec Q1.
-- [ ] T013 [US2] Add the **folder-rejection by delegation** test to `tests/tools/rename-file/handler.test.ts`: mock `rest.openFile` to reject with an `ObsidianApiError` (simulating Obsidian's response when `old_path` is a folder); call the handler; assert the rejection propagates and `rest.executeCommand` was NEVER called (`expect(mockRest.executeCommand).not.toHaveBeenCalled()`). Verifies the R6 design choice: no pre-flight folder check, no partial state.
-- [ ] T013a [P] [US2] Add the **out-of-vault propagation** test to `tests/tools/rename-file/handler.test.ts`: mock `rest.openFile` to reject with an `ObsidianApiError` (simulating Obsidian's response when the path contains `..` or is absolute); call the handler with `{old_path: "../escape.md", new_path: "x.md"}`; assert the rejection propagates and `rest.executeCommand` was NEVER called. Verifies FR-010 by delegation per [data-model.md](./data-model.md) §"Out-of-scope validation rules". (Same shape as T013 but exercises a different rejection cause; the handler treats both identically.)
+- [ ] T012 [P] [US2] **DEFERRED — gated on T005.** **FR-006 collision** test in `handler.test.ts`: mock step 2 (`getFileContents` on `new_path`) to return 200; assert handler throws wrapper-constructed `"destination already exists: <new_path>"` error AND no subsequent REST calls (`putContent`, `findAndReplace`, `deleteFile` all NOT called).
+- [ ] T013 [US2] **DEFERRED — gated on T005.** **FR-007 source-missing** test in `handler.test.ts`: mock step 1 (`getFileContents` on `old_path`) to throw `ObsidianNotFoundError`; assert propagation, assert no subsequent REST calls.
+- [ ] T013a [P] [US2] **FR-010 out-of-vault** test in `handler.test.ts`: mock step 1 to reject for an `old_path` of `"../escape.md"`; assert propagation, assert no subsequent REST calls. **DEFERRED — gated on T005.**
+- [ ] T013b [US2] **NEW under Option B. DEFERRED — gated on T005.** **FR-012 parent-missing** test in `handler.test.ts`: mock step 3 (`listFilesInDir` on `dirname(new_path)`) to throw 404; assert propagation, assert no `putContent`/`findAndReplace`/`deleteFile` calls.
+- [ ] T013c [US2] **NEW under Option B. DEFERRED — gated on T005.** **FR-015 mid-flight failure** test in `handler.test.ts`: mock `findAndReplace` to throw on Pass B; assert response is `{ok: false, failedAtStep: "find_and_replace_pass_B", partialState: {destinationWritten: true, passesCompleted: ["A"], sourceDeleted: false}, error: <upstream message>}` — the partial-state contract from FR-015.
 
 ### Manual end-to-end verification for User Story 2
 
-- [ ] T014 [US2] Run [quickstart.md](./quickstart.md) Part 2 Steps 4, 5, 6 against a real Obsidian instance: collision rejection (Step 4), folder rejection (Step 5), missing-parent-folder rejection (Step 6). Confirm that in all three cases the vault is unchanged.
-
-**Checkpoint**: User Stories 1 and 2 both work and are independently verifiable.
+- [ ] T014 [US2] **DEFERRED — gated on T005, T006-restore, T007.** Run [quickstart.md Part 2 Steps 5, 6, 7, 8, 11](./quickstart.md): collision rejection, source-missing rejection, folder rejection, missing-parent rejection, mid-flight failure observation (Step 11 is the new partial-state verification).
 
 ---
 
-## Phase 5: User Story 3 - Make the link-integrity precondition discoverable (Priority: P2)
+## Phase 5: User Story 3 - Make the precondition + integrity contract discoverable (Priority: P2)
 
-**Goal**: An MCP-aware agent reading `tools/list` can identify, from the tool description alone, that wikilink integrity depends on Obsidian's "Automatically update internal links" setting being enabled. The description text was shipped in T004 (US1); this phase adds the regression test that pins it.
+**Goal**: An MCP-aware agent reading the tool catalogue can identify the operational contract (multi-step / non-atomic, git-clean precondition, wikilink shape coverage, setting-irrelevance) from the description alone. The description text was shipped in T004 (already in commit `bebe709`, rewritten for Option B in this commit); this phase pins it via registration tests.
 
-**Independent Test**: Inspect the MCP tool list (`tools/list` against the running server). Confirm the `rename_file` description text contains `"Automatically update internal links"` and `"Settings → Files & Links"`. (Spec User Story 3.)
+**Independent Test**: Per [quickstart.md Part 2 Step 2](./quickstart.md) — inspect `tools/list` output and verify the four substrings are present.
 
-### Tests for User Story 3 (REQUIRED — Constitution Principle II) ⚠️
+### Tests for User Story 3 (REQUIRED) ⚠️
 
-- [X] T015 [P] [US3] Create `tests/tools/rename-file/registration.test.ts` that imports `RENAME_FILE_TOOLS` and asserts the `description` field of the `rename_file` entry contains all four pinned substrings (separately, in three named tests per [contracts/rename_file.md §"Test-coverage contract"](./contracts/rename_file.md)):
-  - Test "description includes the link-update precondition" — asserts `description` contains both `"Automatically update internal links"` AND `"Settings → Files & Links"`.
-  - Test "description includes the folder-out-of-scope clause" — asserts `description` contains `"Folder paths are out of scope"`.
-  - Test "description includes the no-auto-create clause" — asserts `description` contains `"Missing parent folders are not auto-created"`.
+- [X] T015 [P] [US3] `tests/tools/rename-file/registration.test.ts` — **PINNED SUBSTRINGS REWRITTEN** for Option B. Now imports `RENAME_FILE_TOOLS` directly (decoupled from `ALL_TOOLS` since the latter no longer includes it during the documentation pivot). Six tests covering the registration shape + four description substrings per [contracts/rename_file.md §"Test-coverage contract"](./contracts/rename_file.md):
+  - "RENAME_FILE_TOOLS exports exactly one entry named rename_file"
+  - "inputSchema is the zod-to-json-schema derivative of RenameFileRequestSchema"
+  - "description discloses the multi-step / non-atomic nature" (pins `"multi-step and not atomic"`)
+  - "description discloses the git-clean precondition" (pins `"clean git working tree"`)
+  - "description discloses the wikilink shape coverage" (pins `"Wikilink shape coverage"` heading)
+  - "description discloses irrelevance of the Obsidian setting" (pins `"Automatically update internal links" setting is irrelevant`)
 
-  Mirror the structure of any existing `tests/tools/<name>/registration.test.ts` if one exists; otherwise pattern-match on the project's vitest conventions.
+  Updated in this Option-B documentation pivot commit.
 
 ### Manual end-to-end verification for User Story 3
 
-- [ ] T016 [US3] Run [quickstart.md](./quickstart.md) Part 2 Step 2 against the running server: call `tools/list` from any MCP client and visually confirm the `rename_file` description carries all four pinned substrings.
-
-**Checkpoint**: All three user stories are independently verifiable.
+- [ ] T016 [US3] **DEFERRED — gated on T006-restore.** Run [quickstart.md Part 2 Step 2](./quickstart.md): inspect `tools/list` against the running server. (Currently the tool is un-wired from `ALL_TOOLS` per "no false advertisement" — `tools/list` won't return it. Verification waits for T006-restore.)
 
 ---
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-**Purpose**: Constitution Quality Gates 1–4 plus the regression check that can only be observed against a real Obsidian instance.
-
-- [ ] T017 [P] Run all four Constitution Quality Gates locally and confirm green: `npm run lint && npm run typecheck && npm run build && npm test`. Each must pass with zero warnings (lint) and zero failures (test). If any gate fails, fix the underlying issue — do NOT bypass with `--no-verify` or eslint-disable (per the constitution's stack constraints).
-- [ ] T017a [P] Add an **SC-005 import guard** test to `tests/tools/rename-file/handler.test.ts`: read `src/tools/rename-file/handler.ts` from disk via `readFileSync` and assert it does NOT contain any of the strings `getFileContents`, `putContent`, `appendContent`, or `patchContent`. Pins SC-005 ("zero new code paths that read or write note contents directly") so a future refactor can't silently introduce file-content coupling. Cheapest possible enforcement; one short test, no eslint custom rule, no CI script.
-- [ ] T018 [P] Run [quickstart.md](./quickstart.md) Part 2 Step 9 against a real Obsidian instance: toggle Obsidian's "Automatically update internal links" setting OFF and re-run the happy-path rename. Confirm: file rename still succeeds, but `notes/index.md` is NOT updated (still contains the old wikilink). This is the regression check that proves the FR-005 precondition is real and that the design correctly delegates verification to the caller. **Re-enable the setting when finished.**
-- [ ] T019 In the PR description for this branch, include a one-line Constitution compliance statement per the constitution's Governance section (e.g., `Constitution: Principles I–IV considered; no deviations.`), plus a link to [specs/012-safe-rename/](./).
+- [ ] T017 [P] **Partially satisfied by this commit; full re-run gated on T005.** Run all four Constitution Quality Gates locally and confirm green: `npm run lint && npm run typecheck && npm run build && npm test`. The Option-B documentation pivot commit runs lint + typecheck + tests after the in-this-commit code changes (description rewrite, regex-passes module + tests, registration test rewrite, ALL_TOOLS un-wire); a full re-run waits for T005.
+- [ ] T017a [P] **NEW under Option B (replaces the Option-A SC-005 import-guard).** Add an **SC-005 markdown-AST import guard** test to `tests/tools/rename-file/handler.test.ts` (DEFERRED — gated on T005): read `src/tools/rename-file/handler.ts` from disk via `readFileSync` and assert it does NOT import any of: `marked`, `unified`, `remark`, `rehype`, `mdast-util-*`, `micromark`, `node-html-parser`, or any equivalent markdown-AST / HTML-parser library. The Option-A version of this guard forbade `getFileContents`/`putContent`/`appendContent`/`patchContent` imports — those are now legitimate dependencies under Option B per the SC-005 rewrite (spec.md), so the guard narrows to forbid only the markdown-parser-dependency surface (research §B2 in the user's resolution).
+- [ ] T018 **DROPPED — irrelevant under Option B.** The original Option-A regression check (toggling the "Automatically update internal links" setting off and verifying that the rename still succeeds but wikilinks are NOT rewritten) was a verification of the FR-005 precondition under Option A. Under Option B, that setting is irrelevant — the wrapper's `find_and_replace` passes do the rewriting regardless. The replacement check is [quickstart.md Part 2 Step 12](./quickstart.md) ("setting-irrelevance regression check"), which verifies the inverse: that toggling the setting off has NO effect on Option-B's behaviour. Renamed as a documentation note under Step 12 rather than its own task.
+- [ ] T019 In the PR description for this branch, include a one-line Constitution compliance statement per the constitution's Governance section (e.g., `Constitution: Principles I–IV considered; the Q1 supersession for FR-006 is documented in spec Clarifications; no other deviations.`), plus a link to [specs/012-safe-rename/](./).
 
 ---
 
@@ -131,93 +130,61 @@ description: "Task list for 012-safe-rename: rename_file MCP tool"
 
 ### Phase Dependencies
 
-- **Setup (Phase 1)**: No dependencies — can start immediately.
-- **Foundational (Phase 2)**: Depends on Setup. **BLOCKS all user-story phases** because the spike's output (the working `RENAME_COMMAND_ID`) is hardcoded into T005.
-- **User Story 1 (Phase 3)**: Depends on Phase 2. Delivers the MVP runtime code.
-- **User Story 2 (Phase 4)**: Depends on Phase 3 (specifically T005 — the handler must exist for failure-path tests to import it). No new runtime code.
-- **User Story 3 (Phase 5)**: Depends on Phase 3 (specifically T004 — the description text shipped in `tool.ts` is what the registration test pins). No new runtime code.
-- **Polish (Phase 6)**: Depends on Phases 3–5 being complete (so the test suite is fully populated before T017 runs all gates).
+- **Setup (Phase 1)**: No dependencies — completed (T001).
+- **Foundational (Phase 2)**: T002 spike done (negative outcome). Resolution = Option B. **Blocks all implementation tasks** that depend on `rest.findAndReplace` until Tier 2 backlog item 25 ships and merges to main.
+- **User Story 1 (Phase 3)**: T003 (✓), T004 (✓ description rewritten in this commit), T004a (NEW, ships in this commit), T004b (NEW, ships in this commit). T005, T006-restore, T007 deferred until item 25.
+- **User Story 2 (Phase 4)**: All test tasks deferred until T005 lands. The mock structures depend on the handler signature being final.
+- **User Story 3 (Phase 5)**: T015 ships in this commit (pinned substrings rewritten + decoupled from `ALL_TOOLS`). T016 deferred until T006-restore.
+- **Polish (Phase 6)**: T017 partially runs in this commit; full run after T005. T017a deferred until T005. T018 dropped. T019 PR description.
 
-### Within User Story 1
+### Within User Story 1 (Option-B-revised)
 
-- T003 (schema) and T004 (tool.ts) are independent of each other ([P] together).
-- T005 (handler) depends on T003 (schema import) and T002 (command id constant).
-- T006 (aggregation) depends on T004.
-- T007 (dispatcher) depends on T005.
-- T008 (happy-path test) is independent of T009/T010 in terms of what it asserts but lives in the same file; can be authored together. The [P] marker on T008 reflects that it can be written in parallel with T003/T004 (different file).
-- T009/T010 add tests to the same file as T008, so they're sequential additions to that file.
-- T011 (manual quickstart) depends on T007 being merged so the dispatcher routes to the new handler.
+- T003 (schema) is unchanged — already shipped.
+- T004 (tool.ts description rewrite) is independent of T004a (regex-passes.ts) — different files.
+- T004a (regex-passes.ts) is independent of T004b (regex-passes.test.ts) at write time — different files.
+- T005 (handler) depends on T003, T004, T004a, AND on item 25 having shipped (`rest.findAndReplace` available).
+- T006-restore depends on T005 having landed (tool actually does something before being re-advertised).
+- T007 depends on T005 (need handler to import).
+- T011 (manual quickstart) depends on T005 + T006-restore + T007 (full e2e path).
 
-### Within User Story 2 / User Story 3
+### Item 25 dependency (FR-013, research §R12)
 
-- All tests in US2 and US3 add to existing test files created in US1 (handler.test.ts) or create one new file (registration.test.ts in US3 — independent of US2 work).
-- T012 [P] and T015 [P] are in different files and can be authored simultaneously.
-- T013a (out-of-vault test) [P] is in the same file as T012/T013 (handler.test.ts) but is a separate test case that doesn't conflict with sibling tests at write time; the [P] marker reflects that it's additive, not blocking.
+The handler imports `rest.findAndReplace` as a static module dependency. Until Tier 2 backlog item 25 has shipped and merged to main, the handler cannot be written or tested. The documentation pivot in this commit is fully complete in itself — the spec, plan, contracts, data-model, quickstart, and tasks accurately describe Option B — but the runtime work waits.
 
 ### Parallel Opportunities
 
-- **T003** (schema.ts) || **T004** (tool.ts) || **T008** (handler.test.ts) — three different files, no shared symbols at write time.
-- **T012** (US2 failure-path test) || **T015** (US3 registration.test.ts) — different files.
-- **T013a** (US2 out-of-vault test) — additive sibling to T012/T013 in handler.test.ts; safe to author in parallel with T015.
-- **T017** (quality gates) || **T018** (manual setting-disabled regression check) — `npm` commands and a separate Obsidian session.
-- **T017a** (SC-005 import guard) — sequential after T005 lands (the test reads the handler source from disk); independent of T017/T018 in terms of work, but T017's `npm test` run will only see T017a as a pass after both are in.
-
-### Story-Sharing Note (intentional cross-story coupling)
-
-Because `rename_file` is a single tool with a single `tool.ts` and `handler.ts`, US2 and US3 cannot ship runtime code independently of US1 — there is no second tool to register. This is acceptable because:
-
-- The MVP (US1) ships a complete, working tool with the full description text.
-- US2's contribution is **failure-path test coverage** — pinning behaviour US1 already exhibits via Q1's pure-delegation contract.
-- US3's contribution is the **description-substring registration test** — pinning text US1 already shipped in `tool.ts`.
-
-Each story is still **independently verifiable**: US1 by the happy-path acceptance scenario, US2 by triggering a collision against a running server, US3 by inspecting `tools/list`. The sequential implementation order (US1 → {US2, US3}) reflects code reality, not a story-design weakness.
-
----
-
-## Parallel Example: User Story 1
-
-```text
-# Three different files, no symbol dependencies at write time:
-Task T003: Implement RenameFileRequestSchema in src/tools/rename-file/schema.ts
-Task T004: Implement RENAME_FILE_TOOLS in src/tools/rename-file/tool.ts
-Task T008: Implement happy-path test in tests/tools/rename-file/handler.test.ts
-
-# Then:
-Task T005: Implement handler.ts (depends on T003 + T002)
-
-# Then:
-Task T006: Wire RENAME_FILE_TOOLS into src/tools/index.ts (depends on T004)
-Task T007: Add 'rename_file' case to src/index.ts dispatcher (depends on T005)
-```
+- This Option-B documentation pivot commit: T004 description rewrite || T004a regex-passes.ts || T004b regex-passes.test.ts || T015 registration.test.ts rewrite — four different files, all spike-independent, all independent of each other at write time.
+- Once item 25 ships: T005 (handler) sequential; then T008 / T009 / T010 / T012 / T013 / T013a / T013b / T013c are all in `handler.test.ts` — sibling tests that can be authored in any order but live in the same file.
 
 ---
 
 ## Implementation Strategy
 
-### MVP First (User Story 1 Only)
+### Documentation pivot first (this commit)
 
-1. Complete Phase 1: Setup (T001).
-2. Complete Phase 2: Foundational (T002 spike). **Stop here if the spike fails — escalate to the user.**
-3. Complete Phase 3: User Story 1 (T003–T011).
-4. **STOP and VALIDATE**: Run T011 manual quickstart Part 2 Steps 1, 3, 7, 8 against a real Obsidian instance.
-5. Demo / merge as MVP if all green. The tool is fully functional at this point.
+1. T001 ✓, T002 ✓ (negative outcome).
+2. Apply the Option-B documentation pivot across spec.md, plan.md, research.md, contracts/, data-model.md, quickstart.md, tasks.md, checklists/requirements.md.
+3. Apply the spike-independent code work: T004 description rewrite, T004a (NEW regex-passes.ts), T004b (NEW regex-passes.test.ts), T015 (registration.test.ts rewrite + decouple from ALL_TOOLS), un-wire `RENAME_FILE_TOOLS` from `ALL_TOOLS` per "no false advertisement."
+4. Run lint + typecheck + tests; verify green.
+5. Commit as a single `docs(012)` (or `feat(012)` — refactor judgment) capturing the entire pivot.
 
-### Incremental Delivery (recommended)
+### Implementation phase (deferred until item 25 ships)
 
-1. Complete Setup + Foundational + US1 → ship as MVP commit.
-2. Add US2 tests (T012, T013) + manual regression (T014) → ship as a separate commit pinning failure-path contracts.
-3. Add US3 registration test (T015) + manual inspection (T016) → ship as a separate commit pinning the discoverability contract.
-4. Polish phase (T017–T019) → final commit before PR.
-
-This preserves clean per-story commits in the git history even though the runtime code is shipped in step 1.
+1. Wait for item 25 (`find_and_replace`) feature branch to merge to main.
+2. T005 — write `handler.ts` against the now-importable `rest.findAndReplace`.
+3. T006-restore + T007 — re-wire `ALL_TOOLS` and add the dispatcher case.
+4. T008 / T009 / T010 / T012 / T013 / T013a / T013b / T013c / T017a — author all the handler tests in one or two commits.
+5. T011 / T014 / T016 — manual quickstart steps against TestVault.
+6. T017 — full quality gates re-run.
+7. T019 — PR description.
 
 ### Single-Developer Sequential Strategy
 
-Because all three stories share one tool module, parallel-team work is limited. The realistic single-developer order is:
+Documentation pivot phase (this commit, sequential within the commit):
+- spec.md → plan.md → research.md → contracts/rename_file.md → data-model.md → quickstart.md → tasks.md → checklists/requirements.md → tool.ts description → regex-passes.ts → regex-passes.test.ts → registration.test.ts → src/tools/index.ts un-wire → run gates → commit.
 
-1. T001 → T002 → (T003 || T004) → T005 → T006 → T007 → (T008 → T009 → T010) → T011 (US1 done).
-2. (T012 || T015) → T013 → (T014 || T016) (US2 + US3 done).
-3. (T017 || T018) → T019 (polish + PR).
+Implementation phase (after item 25 ships):
+- T005 → (T008 || T009 || T010 || T012 || T013 || T013a || T013b || T013c || T017a) → T006-restore → T007 → (T011 || T014 || T016) → T017 → T019.
 
 ---
 
@@ -225,8 +192,9 @@ Because all three stories share one tool module, parallel-team work is limited. 
 
 - **[P] tasks** = different files, no dependencies on incomplete tasks.
 - **[Story] label** maps task to its user story for traceability and per-commit grouping.
-- **Tests are required, not optional** — Constitution Principle II is non-negotiable. Skipping any test task is a constitution violation.
-- **The T002 spike is non-negotiable** — do not write handler code until it passes. The risk of an infeasible mechanism is real (see [research.md R4/R5](./research.md)).
-- **Commit per task or per logical group**, not per phase — granular commits make rollback safe if the spike's findings change downstream.
-- **Stop at any checkpoint to validate** — the MVP checkpoint after Phase 3 is the highest-value pause point.
-- **Avoid**: bypassing the spike, swallowing errors with try/catch around `rest.executeCommand`, adding pre-flight existence checks, adding a `create_parents` flag — all four are explicit anti-patterns from the spec/research/contract.
+- **Tests are required, not optional** — Constitution Principle II is non-negotiable.
+- **Item 25 dependency is load-bearing** — the handler simply cannot exist without `rest.findAndReplace`. Per FR-013 / research §R12, this is a build-time dependency; there is no runtime feature-detect.
+- **The Q1 supersession is bounded** — only FR-006 (collision check) deviates from pure delegation. FR-007 / FR-008 / FR-010 / FR-012 all still propagate upstream errors verbatim. The single deviation is documented in spec.md Clarifications as an explicit Q1-supersession entry.
+- **Mid-flight atomicity is explicitly best-effort** (FR-015). The wrapper performs no automated recovery. The git-clean precondition (FR-005(b)) is the rollback baseline.
+- **Commit per task or per logical group**, not per phase — granular commits make rollback safe.
+- **Avoid**: importing markdown-AST libraries (SC-005); inventing a runtime tool-registry abstraction (research §R12); silent overwrite of the destination (FR-006 / Q1 supersession); auto-creating parent folders (FR-012 / Q3); attempting reverse-direction recovery for mid-flight failures (research §R11). All five are explicit anti-patterns from the Option-B redesign.

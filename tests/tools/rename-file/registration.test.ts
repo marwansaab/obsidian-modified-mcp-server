@@ -1,38 +1,51 @@
 import { describe, it, expect } from 'vitest';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
-import { ALL_TOOLS } from '../../../src/tools/index.js';
 import { RenameFileRequestSchema } from '../../../src/tools/rename-file/schema.js';
+import { RENAME_FILE_TOOLS } from '../../../src/tools/rename-file/tool.js';
 
-describe('rename_file tool registration', () => {
-  it('appears in ALL_TOOLS exactly once', () => {
-    const matches = ALL_TOOLS.filter((t) => t.name === 'rename_file');
-    expect(matches).toHaveLength(1);
+// NOTE: This test imports RENAME_FILE_TOOLS directly from `./tool.js`
+// rather than via `ALL_TOOLS`, because under the Option-B documentation
+// pivot the tool is intentionally NOT wired into `ALL_TOOLS` until
+// Tier 2 backlog item 25 (find_and_replace) ships and the handler
+// (T005) is in. This is the project's "no false advertisement"
+// pattern — a registered-but-unimplemented tool would advertise
+// capability it can't deliver. When item 25 ships and the handler
+// lands, `ALL_TOOLS` regains the entry and an "appears in ALL_TOOLS
+// exactly once" assertion can be added back.
+
+describe('rename_file tool registration (Option B)', () => {
+  it('RENAME_FILE_TOOLS exports exactly one entry named rename_file', () => {
+    expect(RENAME_FILE_TOOLS).toHaveLength(1);
+    expect(RENAME_FILE_TOOLS[0]?.name).toBe('rename_file');
   });
 
   it('inputSchema is the zod-to-json-schema derivative of RenameFileRequestSchema', () => {
-    const entry = ALL_TOOLS.find((t) => t.name === 'rename_file');
-    expect(entry).toBeDefined();
+    const entry = RENAME_FILE_TOOLS[0];
     const expected = zodToJsonSchema(RenameFileRequestSchema, { $refStrategy: 'none' });
     expect(entry?.inputSchema).toEqual(expected);
   });
 
-  it('description includes the link-update precondition (FR-005 / SC-002)', () => {
-    const entry = ALL_TOOLS.find((t) => t.name === 'rename_file');
-    const description = entry?.description ?? '';
-    expect(description).toContain('Automatically update internal links');
-    expect(description).toContain('Settings → Files & Links');
+  it('description discloses the multi-step / non-atomic nature (FR-005a)', () => {
+    const description = RENAME_FILE_TOOLS[0]?.description ?? '';
+    expect(description).toContain('multi-step and not atomic');
   });
 
-  it('description includes the folder-out-of-scope clause (FR-001a / Q2)', () => {
-    const entry = ALL_TOOLS.find((t) => t.name === 'rename_file');
-    const description = entry?.description ?? '';
-    expect(description).toContain('Folder paths are out of scope');
+  it('description discloses the git-clean precondition (FR-005b)', () => {
+    const description = RENAME_FILE_TOOLS[0]?.description ?? '';
+    expect(description).toContain('clean git working tree');
   });
 
-  it('description includes the no-auto-create clause (FR-012 / Q3)', () => {
-    const entry = ALL_TOOLS.find((t) => t.name === 'rename_file');
-    const description = entry?.description ?? '';
-    expect(description).toContain('Missing parent folders are not auto-created');
+  it('description discloses the wikilink shape coverage (FR-005c / FR-014)', () => {
+    const description = RENAME_FILE_TOOLS[0]?.description ?? '';
+    expect(description).toContain('Wikilink shape coverage');
+    // Spot-check that at least the bare and embed reliable shapes are listed.
+    expect(description).toContain('[[basename]]');
+    expect(description).toContain('![[basename]]');
+  });
+
+  it('description discloses the irrelevance of the Obsidian setting (FR-005d)', () => {
+    const description = RENAME_FILE_TOOLS[0]?.description ?? '';
+    expect(description).toContain('"Automatically update internal links" setting is irrelevant');
   });
 });
