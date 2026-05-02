@@ -8,6 +8,7 @@ import { GRAPH_TOOLS } from './graph/tool.js';
 import { LIST_TAGS_TOOLS } from './list-tags/tool.js';
 import { OBSIDIAN_TOOLS } from './obsidian-tools.js';
 import { PERIODIC_TOOLS } from './periodic-tools.js';
+import { RENAME_FILE_TOOLS } from './rename-file/tool.js';
 import { SEARCH_TOOLS } from './search-tools.js';
 import { SEMANTIC_TOOLS } from './semantic-tools.js';
 import { SURGICAL_READ_TOOLS } from './surgical-reads/tool.js';
@@ -29,6 +30,11 @@ export const ALL_TOOLS: Tool[] = [
   ...SEMANTIC_TOOLS,
   ...SURGICAL_READ_TOOLS,
   ...LIST_TAGS_TOOLS,
+  // RENAME_FILE_TOOLS intentionally NOT included until Tier 2 backlog
+  // item 25 (find_and_replace) ships and the rename_file handler (T005)
+  // is in. See specs/012-safe-rename/plan.md §"Project Structure" for
+  // the "no false advertisement" rationale. Restoring this entry is a
+  // one-line edit (T006-restore in tasks.md) once the handler exists.
 ];
 
 export {
@@ -43,4 +49,5 @@ export {
   SEMANTIC_TOOLS,
   SURGICAL_READ_TOOLS,
   LIST_TAGS_TOOLS,
+  RENAME_FILE_TOOLS,
 };
