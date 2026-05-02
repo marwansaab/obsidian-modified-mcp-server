@@ -35,4 +35,6 @@ The spec intentionally references the existing `execute_command` tool, the `POST
 
 Likewise, success criterion SC-005 ("the implementation contains no file-content parsing or link-rewriting logic of its own") is technology-agnostic but does constrain implementation shape; this is intentional, since the user explicitly required it.
 
+`/speckit-clarify` (session 2026-05-02) resolved three open contract questions: pure-delegation error handling (Q1 → FR-006, FR-007), notes+attachments scope with folders rejected (Q2 → FR-001, FR-001a, new Edge Cases), and strict no-auto-create for missing parent folders (Q3 → FR-012). All three converged on the same "thin composition / no false advertisement" principle.
+
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
