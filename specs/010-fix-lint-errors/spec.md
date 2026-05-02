@@ -176,7 +176,7 @@ test framework is actually referenced in the file body, (b) the imports satisfy 
   pass after the change with no test added, removed, skipped, or rewritten beyond the import-housekeeping
   edits described in FR-007 through FR-009.
 - **FR-012**: This change MUST NOT modify the coverage threshold values or the coverage gate
-  configuration introduced by the Test infrastructure feature (009). The 82.45% statement-coverage floor
+  configuration introduced by the Test infrastructure feature (009). The 82.4% statement-coverage floor
   MUST remain in force and unchanged.
 - **FR-013**: All three fix categories (coverage-tree ignore, configuration-file resolution, and
   test-file housekeeping) MUST land together in a single pull request, so the lint signal is clean
@@ -222,7 +222,7 @@ test framework is actually referenced in the file body, (b) the imports satisfy 
   warnings, down from 8 errors and 1 warning on the post-merge tree.
 - **SC-002**: Running the test command against the feature branch passes with the same set of tests
   that pass on the post-merge tree (no test added, removed, or skipped) and with the coverage gate
-  still enforcing the 82.45% statement-coverage floor.
+  still enforcing the 82.4% statement-coverage floor.
 - **SC-003**: After regenerating coverage, the coverage tree contains zero files that the linter
   reports on, regardless of how many files the coverage reporter emits.
 - **SC-004**: A contributor adding a new top-level configuration file in the project's primary

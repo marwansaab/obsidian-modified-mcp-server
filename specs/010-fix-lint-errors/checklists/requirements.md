@@ -40,7 +40,7 @@
      name of the public, project-visible rule the contributor sees in lint output, not an
      implementation detail of how it is enforced. Naming it is necessary to make the requirement
      testable.
-  2. The spec names the `82.45%` statement-coverage floor in FR-012 and SC-002. This is an explicit
+  2. The spec names the `82.4%` statement-coverage floor in FR-012 and SC-002. This is an explicit
      contract inherited from feature 009 that this feature must not perturb; pinning the number
      makes the "do not regress" promise verifiable.
 - The Recommended Follow-Up section is explicitly outside acceptance, matching the input

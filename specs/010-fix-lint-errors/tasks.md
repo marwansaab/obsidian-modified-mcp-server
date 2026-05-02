@@ -27,8 +27,8 @@ description: "Task list for feature 010 — Fix Lint Errors"
 
 **Purpose**: Confirm the baseline before editing anything. No project initialization needed — the repository is already configured.
 
-- [ ] T001 Confirm the working tree is the tip of branch `010-fix-lint-errors` and is clean (no uncommitted edits): `git status` — shows clean working tree on `010-fix-lint-errors`.
-- [ ] T002 Reproduce the 9-problem lint baseline so it can be re-checked at every checkpoint: `npm run lint` — output ends with `✖ 9 problems (8 errors, 1 warning)` against the exact files enumerated in [spec.md](spec.md) Reproduce section.
+- [X] T001 Confirm the working tree is the tip of branch `010-fix-lint-errors` and is clean (no uncommitted edits): `git status` — shows clean working tree on `010-fix-lint-errors`.
+- [X] T002 Reproduce the 9-problem lint baseline so it can be re-checked at every checkpoint: `npm run lint` — output ends with `✖ 9 problems (8 errors, 1 warning)` against the exact files enumerated in [spec.md](spec.md) Reproduce section.
 
 ---
 
@@ -52,9 +52,9 @@ This feature has no shared infrastructure to build, no models to scaffold, and n
 
 ### Implementation for User Story 2
 
-- [ ] T003 [P] [US2] Add `'coverage/**'` to the `ignores` array on line 13 of [eslint.config.js](eslint.config.js#L13). Resulting array: `['dist/**/*', 'tsup.config.ts', 'eslint.config.js', 'coverage/**']`. Match the existing `'dist/**/*'` style — quoted string, no trailing comment. (FR-002, FR-003; contract C-002.)
-- [ ] T004 [P] [US2] Append a one-line note to [TESTING.md](TESTING.md) immediately after the bullet that lists what `coverage/` contains (around line 28). Wording — adapt to fit the doc's voice: *"`coverage/` is excluded from `npm run lint` at the ESLint flat-config level (`eslint.config.js` `ignores`), because everything inside it is a generated artifact of the coverage tooling, not source we own."* (FR-004; contract C-009.)
-- [ ] T005 [US2] Verify US2 in isolation: `npm test` (regenerates `coverage/`), then `npm run lint`. The lint command's stdout must contain zero lines matching `coverage/` (test with `npm run lint 2>&1 | Select-String coverage` — zero matches). The exit code at this point may still be non-zero because US3 and US4 have not yet landed; that is expected. (Contracts C-002, C-009.)
+- [X] T003 [P] [US2] Add `'coverage/**'` to the `ignores` array on line 13 of [eslint.config.js](eslint.config.js#L13). Resulting array: `['dist/**/*', 'tsup.config.ts', 'eslint.config.js', 'coverage/**']`. Match the existing `'dist/**/*'` style — quoted string, no trailing comment. (FR-002, FR-003; contract C-002.)
+- [X] T004 [P] [US2] Append a one-line note to [TESTING.md](TESTING.md) immediately after the bullet that lists what `coverage/` contains (around line 28). Wording — adapt to fit the doc's voice: *"`coverage/` is excluded from `npm run lint` at the ESLint flat-config level (`eslint.config.js` `ignores`), because everything inside it is a generated artifact of the coverage tooling, not source we own."* (FR-004; contract C-009.)
+- [X] T005 [US2] Verify US2 in isolation: `npm test` (regenerates `coverage/`), then `npm run lint`. The lint command's stdout must contain zero lines matching `coverage/` (test with `npm run lint 2>&1 | Select-String coverage` — zero matches). The exit code at this point may still be non-zero because US3 and US4 have not yet landed; that is expected. (Contracts C-002, C-009.)
 
 **Checkpoint**: 4 of the 9 baseline problems are gone (the 3 `coverage/lcov-report/*.js` parser errors). 5 remain.
 
@@ -68,8 +68,8 @@ This feature has no shared infrastructure to build, no models to scaffold, and n
 
 ### Implementation for User Story 3
 
-- [ ] T006 [US3] Append `"*.config.ts"` to the `include` array on line 16 of [tsconfig.json](tsconfig.json#L16). Resulting array: `["src", "tests", "scripts", "*.config.ts"]`. Preserve the existing JSON formatting (single-line array, trailing closing bracket on its own line). (FR-005, FR-006; research decision R-1.)
-- [ ] T007 [US3] Verify US3 in isolation. Run both:
+- [X] T006 [US3] Append `"*.config.ts"` to the `include` array on line 16 of [tsconfig.json](tsconfig.json#L16). Resulting array: `["src", "tests", "scripts", "*.config.ts"]`. Preserve the existing JSON formatting (single-line array, trailing closing bracket on its own line). (FR-005, FR-006; research decision R-1.)
+- [X] T007 [US3] Verify US3 in isolation. Run both:
   1. `npm run lint 2>&1 | Select-String "was not found by the project service"` — zero matches.
   2. `npm run typecheck` — exits 0. (`tsup.config.ts` and `vitest.config.ts` both type-check cleanly today; bringing them into the typecheck graph adds no new errors. If a type error appears, treat it as in-scope per [quickstart.md](quickstart.md) "If something fails".)
 
@@ -87,10 +87,10 @@ This feature has no shared infrastructure to build, no models to scaffold, and n
 
 ### Implementation for User Story 4
 
-- [ ] T008 [US4] Run `npx eslint --fix tests/inherited/index.test.ts tests/inherited/services/smart-connections.test.ts` from the repository root. Expected effect: in [tests/inherited/index.test.ts](tests/inherited/index.test.ts), the empty line at line 35 is removed and the `nock` import at line 37 is moved to precede the `node:fs` import at line 33; the `// eslint-disable-next-line @typescript-eslint/no-explicit-any` directive at line 101 is removed. Inspect the diff after the run; do not accept any change outside these two files. (FR-008, FR-009; research decision R-4, R-5.)
-- [ ] T009 [P] [US4] Hand-edit [tests/inherited/index.test.ts](tests/inherited/index.test.ts) (originally line 42 of the unmodified file): in the multi-line vitest helper import block, delete the `beforeAll,` line. The remaining names (`describe`, `it`, `expect`, `afterAll`, `beforeEach`, `afterEach`, `vi`) stay. Final block per [data-model.md](data-model.md) "File 1 — Imports after this feature's edits". (FR-007.)
-- [ ] T010 [P] [US4] Hand-edit [tests/inherited/services/smart-connections.test.ts](tests/inherited/services/smart-connections.test.ts) (originally line 16): drop `beforeEach,` from the same-line vitest import. The line becomes `import { describe, it, expect, afterEach } from 'vitest';`. Other imports on the same line stay. (FR-007.)
-- [ ] T011 [US4] Verify US4 in isolation:
+- [X] T008 [US4] Run `npx eslint --fix tests/inherited/index.test.ts tests/inherited/services/smart-connections.test.ts` from the repository root. Expected effect: in [tests/inherited/index.test.ts](tests/inherited/index.test.ts), the empty line at line 35 is removed and the `nock` import at line 37 is moved to precede the `node:fs` import at line 33; the `// eslint-disable-next-line @typescript-eslint/no-explicit-any` directive at line 101 is removed. Inspect the diff after the run; do not accept any change outside these two files. (FR-008, FR-009; research decision R-4, R-5.)
+- [X] T009 [P] [US4] Hand-edit [tests/inherited/index.test.ts](tests/inherited/index.test.ts) (originally line 42 of the unmodified file): in the multi-line vitest helper import block, delete the `beforeAll,` line. The remaining names (`describe`, `it`, `expect`, `afterAll`, `beforeEach`, `afterEach`, `vi`) stay. Final block per [data-model.md](data-model.md) "File 1 — Imports after this feature's edits". (FR-007.)
+- [X] T010 [P] [US4] Hand-edit [tests/inherited/services/smart-connections.test.ts](tests/inherited/services/smart-connections.test.ts) (originally line 16): drop `beforeEach,` from the same-line vitest import. The line becomes `import { describe, it, expect, afterEach } from 'vitest';`. Other imports on the same line stay. (FR-007.)
+- [X] T011 [US4] Verify US4 in isolation:
   1. `npm run lint -- tests/inherited/index.test.ts tests/inherited/services/smart-connections.test.ts` — exits 0 with no `@typescript-eslint/no-unused-vars`, `import/order`, or `Unused eslint-disable directive` lines for either file.
   2. `npm test` — exits 0. The two affected test files run without skips; the coverage `text` reporter's `All files` row remains at or above the 82.4% statements floor. (FR-007, FR-008, FR-009, FR-011; contract C-004.)
 
@@ -108,11 +108,11 @@ This feature has no shared infrastructure to build, no models to scaffold, and n
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] Run the full top-of-tree lint: `npm run lint`. Confirm exit code 0; confirm output ends with no `✖` summary line at all (or `✔` if your ESLint version emits one). Confirm zero `error` or `warning` lines for any path. (FR-001, FR-013; contracts C-001, C-008.)
-- [ ] T013 [US1] Run the full test suite: `npm test`. Confirm exit code 0; confirm the `text` reporter's `All files` row shows statement coverage `>= 82.4%`; confirm no message of the form `Coverage for statements (X%) does not meet global threshold (82.4%)` appears. (FR-011, FR-012; contracts C-006, C-007.)
-- [ ] T014 [US1] Confirm production source is untouched: `git diff main..HEAD -- src/` produces empty output. (FR-010; contract C-005.)
-- [ ] T015 [US1] Confirm vitest config threshold is untouched: `git diff main..HEAD -- vitest.config.ts` either produces empty output or, if any diff is present, the `thresholds.statements` value remains exactly `82.4` on the post-feature side. (FR-012; contract C-007.)
-- [ ] T016 [US1] Walk through every contract assertion in [contracts/lint-and-config-contracts.md](contracts/lint-and-config-contracts.md) (C-001 through C-009) and tick each post-condition. Any assertion that does not hold blocks merge.
+- [X] T012 [US1] Run the full top-of-tree lint: `npm run lint`. Confirm exit code 0; confirm output ends with no `✖` summary line at all (or `✔` if your ESLint version emits one). Confirm zero `error` or `warning` lines for any path. (FR-001, FR-013; contracts C-001, C-008.)
+- [X] T013 [US1] Run the full test suite: `npm test`. Confirm exit code 0; confirm the `text` reporter's `All files` row shows statement coverage `>= 82.4%`; confirm no message of the form `Coverage for statements (X%) does not meet global threshold (82.4%)` appears. (FR-011, FR-012; contracts C-006, C-007.)
+- [X] T014 [US1] Confirm production source is untouched: `git diff main..HEAD -- src/` produces empty output. (FR-010; contract C-005.)
+- [X] T015 [US1] Confirm vitest config threshold is untouched: `git diff main..HEAD -- vitest.config.ts` either produces empty output or, if any diff is present, the `thresholds.statements` value remains exactly `82.4` on the post-feature side. (FR-012; contract C-007.)
+- [X] T016 [US1] Walk through every contract assertion in [contracts/lint-and-config-contracts.md](contracts/lint-and-config-contracts.md) (C-001 through C-009) and tick each post-condition. Any assertion that does not hold blocks merge.
 
 **Checkpoint**: Feature complete. The merge can land.
 
@@ -122,13 +122,13 @@ This feature has no shared infrastructure to build, no models to scaffold, and n
 
 **Purpose**: Tidy the spec text, package the PR, and (separately) capture the recommended follow-up.
 
-- [ ] T017 Replace the literal string `82.45%` with `82.4%` in **three** locations across the spec-track artifacts (per the `/speckit-analyze` finding I1):
+- [X] T017 Replace the literal string `82.45%` with `82.4%` in **three** locations across the spec-track artifacts (per the `/speckit-analyze` finding I1):
   1. [spec.md:179](spec.md) — FR-012 ("the 82.45% statement-coverage floor MUST remain in force and unchanged").
   2. [spec.md:225](spec.md) — SC-002 ("with the coverage gate still enforcing the 82.45% statement-coverage floor").
   3. [checklists/requirements.md:43](checklists/requirements.md) — the meta-note that quoted "82.45%" as the deliberately-pinned floor.
 
   Sweep each file once with a find to confirm zero residual `82.45%` strings. Reason: the canonical floor is `82.4` per [vitest.config.ts](../../vitest.config.ts) line 15 and [TESTING.md](../../TESTING.md) line 41. (Research decision R-3; analyze finding I1.)
-- [ ] T018 Confirm the changeset matches the planned scope: `git diff main..HEAD --name-only` returns exactly six paths — `eslint.config.js`, `tsconfig.json`, `tests/inherited/index.test.ts`, `tests/inherited/services/smart-connections.test.ts`, `TESTING.md`, `specs/010-fix-lint-errors/spec.md`. (Plus the `specs/010-fix-lint-errors/` Phase 0/1 artifacts already committed by `/speckit-plan`'s after-hook, if you used it.) Any other path indicates scope creep that must be reverted before merging.
+- [X] T018 Confirm the changeset matches the planned scope: `git diff main..HEAD --name-only` returns exactly six paths — `eslint.config.js`, `tsconfig.json`, `tests/inherited/index.test.ts`, `tests/inherited/services/smart-connections.test.ts`, `TESTING.md`, `specs/010-fix-lint-errors/spec.md`. (Plus the `specs/010-fix-lint-errors/` Phase 0/1 artifacts already committed by `/speckit-plan`'s after-hook, if you used it.) Any other path indicates scope creep that must be reverted before merging.
 - [ ] T019 Open the pull request. Title (≤ 70 chars): `fix(010): restore clean lint on post-009 tree`. Body must include:
   - One-line summary of the three fix categories.
   - Constitution compliance line per Governance: "Principles I–IV considered; no deviation."

@@ -10,7 +10,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**/*', 'tsup.config.ts', 'eslint.config.js'],
+    ignores: ['dist/**/*', 'tsup.config.ts', 'eslint.config.js', 'coverage/**'],
   },
   js.configs.recommended,
   {
