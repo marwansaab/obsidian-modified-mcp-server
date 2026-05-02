@@ -11,7 +11,13 @@ import {
   ObsidianNotFoundError,
   ObsidianTimeoutError,
 } from './obsidian-rest-errors.js';
+import { runFindAndReplace } from '../tools/find-and-replace/find-and-replace.js';
 
+
+import type {
+  FindAndReplaceResult,
+  RestFindAndReplaceOptions,
+} from '../tools/find-and-replace/types.js';
 import type { SearchResult, VaultConfig } from '../types.js';
 
 export class ObsidianRestService {
@@ -369,5 +375,33 @@ export class ObsidianRestService {
     return this.safeCall(async () => {
       await this.client.post(`/commands/${encodeURIComponent(commandId)}`);
     });
+  }
+
+  /**
+   * Vault-wide find-and-replace across every `.md` file (excluding
+   * dot-prefixed directories, with optional `pathPrefix` scoping).
+   *
+   * This method is the LAYER 3 helper consumed by:
+   *   - the public `find_and_replace` MCP tool (via handler.ts), and
+   *   - 012's `rename_file` handler once it ships.
+   *
+   * The method itself is vault-agnostic at its boundary — multi-vault
+   * routing happens by virtue of which `ObsidianRestService` instance
+   * the caller invokes it on (dispatcher → getRestService(vaultId) →
+   * this instance). See specs/013-find-and-replace/research.md §R8 and
+   * specs/013-find-and-replace/contracts/find_and_replace.md §"Surface 2".
+   *
+   * @param opts - replacement options (see RestFindAndReplaceOptions)
+   * @returns the FindAndReplaceResult shape from data-model.md §5
+   *
+   * Note: the result's `vaultId` field is populated with `this.vault.id`
+   * so callers don't have to thread the resolved id separately. When
+   * the public tool calls this method, the dispatcher has already
+   * resolved the id — the two values agree.
+   */
+  async findAndReplace(
+    opts: RestFindAndReplaceOptions,
+  ): Promise<FindAndReplaceResult> {
+    return runFindAndReplace(this, opts, this.vault.id);
   }
 }

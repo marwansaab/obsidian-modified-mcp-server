@@ -289,6 +289,7 @@ All tools accept an optional `vaultId` argument. If omitted, the server uses the
 | `append_content` | Append to file (creates if missing) |
 | `put_content` | Overwrite file content |
 | `patch_content` | Insert content relative to a heading, block, or frontmatter target. **Heading targets must use the full `H1::H2[::H3...]` path form** — see [Heading-path discipline](#heading-path-discipline-patch_content-get_heading_contents) above. |
+| `find_and_replace` | Vault-wide string-replacement across every `.md` file. Literal or regex (with capture groups). Optional `dryRun: true` preview, `skipCodeBlocks` / `skipHtmlComments` to preserve audit-trail content, `pathPrefix` scoping, and per-vault routing. **Destructive — run with `dryRun: true` first.** Per-file size cap 5 MB on input AND output. |
 
 ### Search
 
@@ -372,6 +373,18 @@ upstream error propagation) lives in
 Per-feature specs, plans, contracts, and task lists live under
 [`specs/`](specs/). Pull requests should confirm that constitution
 Principles I–IV were considered.
+
+## Attributions
+
+### `find_and_replace` (feature 013)
+
+`find_and_replace` is composed of three layers, two of which carry attribution to upstream Obsidian-MCP projects:
+
+- **LAYER 1 — Per-note replacement primitive**: algorithm credited to [`cyanheads/obsidian-mcp-server`](https://github.com/cyanheads/obsidian-mcp-server)'s `obsidian_replace_in_note` tool (Apache-2.0). The single-pass left-to-right scan over a single note follows that project's pattern; JavaScript's native `String.prototype.replaceAll` and `String.prototype.replace(/.../g, ...)` provide the actual replacement work. Source-header attribution lives in [`src/tools/find-and-replace/pattern-builder.ts`](src/tools/find-and-replace/pattern-builder.ts) and [`src/tools/find-and-replace/replacer.ts`](src/tools/find-and-replace/replacer.ts).
+- **LAYER 2 — Vault-wide composition + dry-run**: pattern credited to [`blacksmithers/vaultforge`](https://github.com/blacksmithers/vaultforge)'s `grep-sub` tool (MIT). The dry-run-with-preview concept and the vault-walk strategy are borrowed; the exact preview shape (structured per-match objects with line/column/before/after fields, see FR-015) is this project's own design. Source-header attribution lives in [`src/tools/find-and-replace/region-detector.ts`](src/tools/find-and-replace/region-detector.ts) and [`src/tools/find-and-replace/preview-formatter.ts`](src/tools/find-and-replace/preview-formatter.ts).
+- **LAYER 3 — Multi-vault dispatch wrapper**: original contribution of this project. Wraps LAYER 1 + LAYER 2 with the existing `getRestService(vaultId)` plumbing (inherited from Connor Britain's upstream and hardened across multiple configured vaults) so the entire find-and-replace surface routes per-vault by default. **None of cyanheads, vaultforge, or MCPVault provides this.** Source attribution lives in [`src/tools/find-and-replace/walker.ts`](src/tools/find-and-replace/walker.ts), [`src/tools/find-and-replace/response-builder.ts`](src/tools/find-and-replace/response-builder.ts), and the `findAndReplace` method on [`src/services/obsidian-rest.ts`](src/services/obsidian-rest.ts).
+
+The corresponding feature spec, plan, and contracts live in [`specs/013-find-and-replace/`](specs/013-find-and-replace/).
 
 ## License
 
