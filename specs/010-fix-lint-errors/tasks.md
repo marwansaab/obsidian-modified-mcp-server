@@ -129,7 +129,7 @@ This feature has no shared infrastructure to build, no models to scaffold, and n
 
   Sweep each file once with a find to confirm zero residual `82.45%` strings. Reason: the canonical floor is `82.4` per [vitest.config.ts](../../vitest.config.ts) line 15 and [TESTING.md](../../TESTING.md) line 41. (Research decision R-3; analyze finding I1.)
 - [X] T018 Confirm the changeset matches the planned scope: `git diff main..HEAD --name-only` returns exactly six paths — `eslint.config.js`, `tsconfig.json`, `tests/inherited/index.test.ts`, `tests/inherited/services/smart-connections.test.ts`, `TESTING.md`, `specs/010-fix-lint-errors/spec.md`. (Plus the `specs/010-fix-lint-errors/` Phase 0/1 artifacts already committed by `/speckit-plan`'s after-hook, if you used it.) Any other path indicates scope creep that must be reverted before merging.
-- [ ] T019 Open the pull request. Title (≤ 70 chars): `fix(010): restore clean lint on post-009 tree`. Body must include:
+- [X] T019 Open the pull request. Title (≤ 70 chars): `fix(010): restore clean lint on post-009 tree`. Body must include:
   - One-line summary of the three fix categories.
   - Constitution compliance line per Governance: "Principles I–IV considered; no deviation."
   - Reference to [spec.md](spec.md), [plan.md](plan.md), and the quickstart verification.
