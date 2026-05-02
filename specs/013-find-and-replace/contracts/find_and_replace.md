@@ -65,11 +65,23 @@ where `findAndReplaceResult` is the `FindAndReplaceResult` shape documented in [
 The dispatcher branch in [src/index.ts](../../../src/index.ts):
 
 ```typescript
-case 'find_and_replace':
-  return handleFindAndReplace(args, this.getRestService(this.resolveVaultId(args)));
+case 'find_and_replace': {
+  const resolvedVaultId = this.resolveVaultId(args);
+  return handleFindAndReplace(args, this.getRestService(resolvedVaultId), resolvedVaultId);
+}
 ```
 
-`resolveVaultId(args)` reads the optional `args.vaultId` and either returns it (validated against configured vaults) or returns the default. `getRestService(vaultId)` returns the per-vault `ObsidianRestService` instance — same plumbing as every other vault-aware tool. **None** of the LAYER 1 / LAYER 2 sources support this; it is the LAYER 3 original contribution per FR-027.
+`resolveVaultId(args)` reads the optional `args.vaultId` and either returns it (validated against configured vaults) or returns the default. `getRestService(vaultId)` returns the per-vault `ObsidianRestService` instance — same plumbing as every other vault-aware tool. The dispatcher passes the resolved id into the handler as a third argument so the response can echo `vaultId` per [data-model.md §5](../data-model.md#5-findandreplaceresult-response-shape) without the handler needing to re-resolve it. **None** of the LAYER 1 / LAYER 2 sources support this; it is the LAYER 3 original contribution per FR-027.
+
+The handler signature is therefore:
+
+```typescript
+export async function handleFindAndReplace(
+  args: Record<string, unknown>,
+  rest: ObsidianRestService,
+  resolvedVaultId: string,
+): Promise<CallToolResult>;
+```
 
 ---
 
@@ -155,7 +167,8 @@ Tests live under `tests/tools/find-and-replace/` and `tests/services/find-and-re
 | `tests/tools/find-and-replace/replacer.test.ts` | Single-pass global per FR-006 (replacement containing search not re-scanned); capture-group `$1`/`$&` honored; `\b` at skip-region edges per FR-009a; byte-identical no-op per FR-014. |
 | `tests/tools/find-and-replace/walker.test.ts` | Dot-prefix exclusion per FR-024b; `.md` case-insensitive per FR-024; `pathPrefix` segment match per FR-004; trailing slash normalized away. |
 | `tests/tools/find-and-replace/preview-formatter.test.ts` | `MatchPreview` shape per FR-015; ≤40 code-point context truncation (R9); newlines preserved literally; multi-byte / non-BMP characters handled. |
-| `tests/tools/find-and-replace/handler.test.ts` | **(Principle II minimum)** ≥1 happy path; ≥1 mid-sweep failure (FR-021a `failures` array); dry-run zero-write; multi-vault routing (`vaultId: 'research'` modifies research vault, NOT default); CRLF preservation on a CRLF fixture (FR-016a). |
+| `tests/tools/find-and-replace/response-builder.test.ts` | `assembleResult` aggregate counters (`filesScanned`, `filesModified`, `filesSkipped`, `totalReplacements`, `totalMatchesInSkippedRegions`); FR-020c sort order across `perFile` / `failures` / `skipped` arrays; empty-array omission; R16 1 MB response cap with `responseTruncated: true`; SC-006 — empty-result response for a 5,000-file synthetic enumeration JSON-stringifies under 500 bytes. |
+| `tests/tools/find-and-replace/handler.test.ts` | **(Principle II minimum)** ≥1 happy path; ≥1 mid-sweep failure (FR-021a `failures` array); dry-run zero-write; multi-vault routing (`vaultId: 'research'` modifies research vault, NOT default) + invalid `vaultId` rejected (FR-019); CRLF preservation on a CRLF fixture (FR-016a); `vaultId` echoed in response. |
 | `tests/services/find-and-replace/rest-find-and-replace.test.ts` | The `rest.findAndReplace` helper signature 012 imports; `RestFindAndReplaceOptions` defaults; result shape; vault-agnostic boundary (no `vaultId` field on the helper). |
 
 **Constitutional minimum**: `handler.test.ts` is the file that satisfies Principle II's "≥1 happy + ≥1 failure path" requirement. The other test files are structural-correctness gates beyond the constitutional minimum, similar to the 012 spec's pattern.
