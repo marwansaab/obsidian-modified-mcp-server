@@ -247,7 +247,8 @@ function successResponse(old_path: string, new_path: string): CallToolResult {
 | FR-001a (folder rejection) | Description text declares scope; rejection enforced by error propagation from upstream |
 | FR-002 (dispatch via command endpoint) | Pseudocode `rest.executeCommand(RENAME_COMMAND_ID)` |
 | FR-003 (thin composition; no parsing) | Handler contains no file-content reads/writes; success response synthesised from validated inputs |
-| FR-004 (link integrity on success) | Inherited from Obsidian's command behaviour — no contract surface in this tool |
+| FR-004 (link integrity on success, both `[[wikilinks]]` and `![[embeds]]`) | Inherited from Obsidian's command behaviour — no contract surface in this tool. Description text explicitly lists both reference forms. |
+| FR-004a (alias preservation on rewritten wikilinks) | Inherited from Obsidian — no contract surface. Verified by manual quickstart Step 3 (US1 acceptance scenario 2). |
 | FR-005 (precondition in description) | Explicitly bolded in the Description text; pinned by `registration.test.ts` |
 | FR-006 (collision rejection) | Delegated; failure path #3 |
 | FR-007 (missing-source rejection) | Delegated; failure path #2 |
@@ -277,5 +278,8 @@ function successResponse(old_path: string, new_path: string): CallToolResult {
 | `handler.test.ts` | "failure path: upstream `executeCommand` error propagates verbatim" | Mocked `rest.executeCommand` throws an `ObsidianApiError`; asserts the handler does not catch it and the error propagates with status code intact (Principle IV / Q1). |
 | `handler.test.ts` | "validation: missing `old_path` rethrows as `Invalid input — old_path: …`" | Pins the zod re-throw shape used by the dispatcher. |
 | `handler.test.ts` | "FR-009: identical paths short-circuits with no REST calls" | Mocked `rest` recording calls; asserts neither `openFile` nor `executeCommand` was invoked. |
+| `handler.test.ts` | "folder-rejection by delegation" | Mocked `rest.openFile` rejects; asserts the rejection propagates and `executeCommand` is never called. Pins R6 / FR-001a. |
+| `handler.test.ts` | "out-of-vault path rejection by delegation" | Mocked `rest.openFile` rejects when given `../escape.md`; asserts the rejection propagates and `executeCommand` is never called. Pins FR-010. |
+| `handler.test.ts` | "SC-005 import guard" | Reads `src/tools/rename-file/handler.ts` from disk and asserts it does not contain `getFileContents`/`putContent`/`appendContent`/`patchContent`. Pins SC-005 against future regressions. |
 
 Adding more tests is encouraged; removing any of these violates Principle II.

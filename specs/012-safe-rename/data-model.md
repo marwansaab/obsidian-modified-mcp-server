@@ -46,7 +46,7 @@ These are promoted from the spec's "Key Entities" section. They are not new data
 | `alias` | `string \| undefined` | Display text after `\|`, if present. **Preserved verbatim** during a rename. |
 | `containing_file` | `path` | Which vault file the reference appears in. |
 
-**State transition during rename**: When the rename succeeds AND Obsidian's "Automatically update internal links" setting is enabled (FR-005 precondition), every `WikilinkReference` whose `target` resolved to the renamed file is rewritten so `target` resolves to the new path; `alias` is preserved. This rewriting is performed entirely by Obsidian — this tool MUST NOT inspect or modify reference text (SC-005).
+**State transition during rename**: When the rename succeeds AND Obsidian's "Automatically update internal links" setting is enabled (FR-005 precondition), every `WikilinkReference` whose `target` resolved to the renamed file is rewritten so `target` resolves to the new path; `alias` is preserved (FR-004a). The same rewrite applies to embed references `![[target]]` referencing the renamed file (FR-004), which is the path that covers attachment renames. This rewriting is performed entirely by Obsidian — this tool MUST NOT inspect or modify reference text (SC-005).
 
 ### 4. Obsidian command
 
@@ -79,9 +79,10 @@ The handler operates on three values: the validated request, the void return fro
 
 - If `old_path === new_path` after trimming, the handler returns the FR-009 idempotent no-op result without dispatching any REST call. This is the only cross-field check; all other validation is delegated to Obsidian per Q1.
 
-**Out-of-scope validation rules** (deliberately NOT enforced by this tool, per Q1's pure-delegation contract):
+**Out-of-scope validation rules** (deliberately NOT enforced by this tool, per Q1's pure-delegation contract — all of these are handled by error propagation from the upstream `openFile`/`executeCommand` calls, with the resulting error message coming from Obsidian rather than the tool):
 
 - Existence of `old_path`. Delegated to upstream `openFile` / `executeCommand`. (FR-007.)
+- File-vs-folder kind of `old_path`. Delegated; failure manifests at `openFile` time. (FR-001a.)
 - Non-existence of `new_path` (collision check). Delegated to upstream `executeCommand`. (FR-006.)
 - Existence of `new_path`'s parent folder. Delegated. (FR-012.)
 - "Inside-the-vault" check for either path. Delegated to the underlying REST endpoints' own path resolution, which will fail for paths that escape the vault. (FR-010 — note that `axios` URL composition + the REST plugin's path resolution together form the boundary; this tool does not add a separate `..`/absolute-path filter.)
