@@ -122,7 +122,12 @@ This feature has no shared infrastructure to build, no models to scaffold, and n
 
 **Purpose**: Tidy the spec text, package the PR, and (separately) capture the recommended follow-up.
 
-- [ ] T017 In [spec.md](spec.md), replace the literal string `82.45%` with `82.4%` in two locations: FR-012 ("the 82.45% statement-coverage floor MUST remain in force and unchanged") and SC-002 ("with the coverage gate still enforcing the 82.45% statement-coverage floor"). Both other occurrences in spec.md (the literal `82.45%` in the Recommended Follow-Up area and assumptions, if any) should also be normalised — sweep the file once with a find. Reason: the canonical floor is `82.4` per [vitest.config.ts](../../vitest.config.ts) and [TESTING.md](../../TESTING.md). (Research decision R-3.)
+- [ ] T017 Replace the literal string `82.45%` with `82.4%` in **three** locations across the spec-track artifacts (per the `/speckit-analyze` finding I1):
+  1. [spec.md:179](spec.md) — FR-012 ("the 82.45% statement-coverage floor MUST remain in force and unchanged").
+  2. [spec.md:225](spec.md) — SC-002 ("with the coverage gate still enforcing the 82.45% statement-coverage floor").
+  3. [checklists/requirements.md:43](checklists/requirements.md) — the meta-note that quoted "82.45%" as the deliberately-pinned floor.
+
+  Sweep each file once with a find to confirm zero residual `82.45%` strings. Reason: the canonical floor is `82.4` per [vitest.config.ts](../../vitest.config.ts) line 15 and [TESTING.md](../../TESTING.md) line 41. (Research decision R-3; analyze finding I1.)
 - [ ] T018 Confirm the changeset matches the planned scope: `git diff main..HEAD --name-only` returns exactly six paths — `eslint.config.js`, `tsconfig.json`, `tests/inherited/index.test.ts`, `tests/inherited/services/smart-connections.test.ts`, `TESTING.md`, `specs/010-fix-lint-errors/spec.md`. (Plus the `specs/010-fix-lint-errors/` Phase 0/1 artifacts already committed by `/speckit-plan`'s after-hook, if you used it.) Any other path indicates scope creep that must be reverted before merging.
 - [ ] T019 Open the pull request. Title (≤ 70 chars): `fix(010): restore clean lint on post-009 tree`. Body must include:
   - One-line summary of the three fix categories.
