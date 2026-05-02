@@ -343,12 +343,16 @@ npm run typecheck
 # Build
 npm run build
 
-# Run the test suite (vitest + nock-mocked HTTP)
+# Run the test suite (vitest + nock-mocked HTTP, V8 coverage gate)
 npm test
 
 # Run tests in watch mode
 npm run test:watch
 ```
+
+See [TESTING.md](TESTING.md) for the coverage gate's floor, the
+ratchet procedure, and the AS-IS-vs.-fork-authored test directory
+convention.
 
 ### Project Constitution & Spec-Driven Workflow
 
