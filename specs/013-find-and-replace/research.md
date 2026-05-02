@@ -15,7 +15,7 @@ This document resolves every NEEDS CLARIFICATION item from the Technical Context
 - Vendor cyanheads's source verbatim: heavy and unnecessary; the algorithm is one line of JS.
 - Skip the attribution: would require a different prior-art credit story; the brief explicitly asks for cyanheads to be named.
 
-**Action item for implementation**: Verify the license file in `cyanheads/obsidian-mcp-server` (likely `LICENSE` at the repo root) is permissive (MIT, Apache-2, BSD). If permissive, proceed with attribution. If non-permissive (GPL, AGPL, custom): pivot to "inspired by" language, do not lift any code patterns, and document the decision in this section. **Failing this check blocks the merge per FR-025.**
+**Verified license** (T001, 2026-05-03): `cyanheads/obsidian-mcp-server` ships under **Apache-2.0** (verified via `https://api.github.com/repos/cyanheads/obsidian-mcp-server` → `license.spdx_id`). Apache-2.0 is permissive and compatible with this project's MIT license; attribution headers in source files and the README's "Attributions" section satisfy Apache-2.0's notice obligations.
 
 ## R2 — Blacksmithers/vaultforge license verification (LAYER 2 attribution)
 
@@ -27,7 +27,7 @@ This document resolves every NEEDS CLARIFICATION item from the Technical Context
 - Use only conceptual prior-art credit: same outcome but vaguer; the brief explicitly names vaultforge.
 - Add attribution only on `preview-formatter.ts`: the vault-walk strategy ALSO came from there per the brief, so `walker.ts` deserves attribution too — but `walker.ts` is the layer with the most LAYER-3 contribution (multi-vault routing through `getRestService`), so the attribution there is split: "vault-walk strategy borrowed from vaultforge; per-vault dispatch is original."
 
-**Action item for implementation**: Verify `blacksmithers/vaultforge`'s license. If permissive, proceed. If non-permissive: same fallback as R1 — "inspired by" language, no code lifting, documented here. **Same merge gate as R1.**
+**Verified license** (T002, 2026-05-03): `blacksmithers/vaultforge` ships under **MIT** (verified via `https://api.github.com/repos/blacksmithers/vaultforge` → `license.spdx_id`). MIT is permissive and compatible with this project's MIT license; attribution headers in source files and the README's "Attributions" section satisfy MIT's notice obligations.
 
 ## R3 — JS replace semantics for single-pass global (FR-006)
 
@@ -192,13 +192,13 @@ to upstream Obsidian-MCP projects:
 
 - **LAYER 1 — Per-note replacement primitive**: algorithm credited to
   [cyanheads/obsidian-mcp-server](https://github.com/cyanheads/obsidian-mcp-server)'s
-  `obsidian_replace_in_note` tool (license: [verified at implementation time]).
+  `obsidian_replace_in_note` tool (license: Apache-2.0).
   Source-header attribution lives in `src/tools/find-and-replace/pattern-builder.ts`
   and `src/tools/find-and-replace/replacer.ts`.
 
 - **LAYER 2 — Vault-wide composition + dry-run**: pattern credited to
   [blacksmithers/vaultforge](https://github.com/blacksmithers/vaultforge)'s
-  `grep-sub` tool (license: [verified at implementation time]). Dry-run preview
+  `grep-sub` tool (license: MIT). Dry-run preview
   format and vault-walk strategy borrowed. Source-header attribution lives in
   `src/tools/find-and-replace/region-detector.ts` and
   `src/tools/find-and-replace/preview-formatter.ts`.
